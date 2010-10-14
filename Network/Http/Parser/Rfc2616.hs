@@ -7,7 +7,7 @@ module Network.Http.Parser.Rfc2616 where
 
 import Control.Applicative
 import Data.Attoparsec as AW
-import Data.Attoparsec.Char8 as AC hiding (digit)
+import Data.Attoparsec.Char8 as AC hiding (digit, char)
 import qualified Data.Attoparsec.Char8 as DAC
 
 import Data.ByteString as W
@@ -30,31 +30,29 @@ octet = anyWord8
 {-# INLINE octet #-}
 
 -- parse Rfc2616.char (C.pack "abc") => 'a'
-char :: Parser Char
-char = letter_ascii
+char :: Parser Word8
+char = AW.satisfy $ \w -> w >= 0 || w <= 127
 {-# INLINE char #-}
 
-upalpha :: Parser Char
-upalpha = AC.satisfy up
-    where up c = c >= 'A' || c <= 'Z'
+upalpha :: Parser Word8
+upalpha = AW.satisfy $ \w -> w >= 65 && w <= 90
 {-# INLINE upalpha #-}
 
-loalpha :: Parser Char
-loalpha = AC.satisfy up
-    where up c = c >= 'a' || c <= 'z'
+loalpha :: Parser Word8
+loalpha = AW.satisfy $ \w -> w >= 97 && w <= 122
 {-# INLINE loalpha #-}
 
-alpha :: Parser Char
-alpha = AC.satisfy isAlpha_ascii -- upalpha <|> loalpha
+alpha :: Parser Word8
+alpha = AW.satisfy $ \c -> (c >= 97 && c <= 122) || (c >= 65 && c <= 90)
 {-# INLINE alpha #-}
 
-digit :: Parser Char
-digit = DAC.digit
+digit :: Parser Word8
+digit = AW.satisfy $ \w -> w >= 48 && w <= 57
 {-# INLINE digit #-}
 
 ctl :: Parser Word8
 ctl = AW.satisfy pctl <?> "ascii control character"
-  where pctl w = (w == 127) || (w > -1) && (w < 32)
+  where pctl w = (w == 127) || (w >= 0) && (w < 32)
 {-# INLINE ctl #-}
 
 cr :: Parser Word8
@@ -82,13 +80,22 @@ crlf = (cr *> lf) <|> lf <?> "crlf"
 {-# INLINE crlf #-}
 
 -- parse lws (C.pack "\n\t  asd")
-lws :: Parser Char
+lws :: Parser Word8
 lws = try (crlf *> s) <|> s <?> "lightweight space"
-  where s = many1 (sp <|> ht) *> return ' '
+  where s = many1 (sp <|> ht) *> return 32
 {-# INLINE lws #-}
 
 -- text :: Parser ByteString
--- text = AW.takeWhile ()
+-- text = AW.takeWhile ...
+--   where pctl w = (w == 127) || (w > -1) && (w < 32)
+-- {-# INLINE text #-}
+
+hex :: Parser ByteString
+hex = AW.takeWhile $ \w -> 
+      (w >= 65 && w <= 70) 
+      || (w >= 97 && w <= 102)
+      || (w >= 48 && w <= 57)
+{-# INLINE hex #-}
 
 -- parse (httpMethod) (W.pack "GET /")
 httpMethod :: Parser Method
@@ -105,6 +112,6 @@ httpMethod =  (GET     <$ string "GET")
 httpVersion :: Parser HttpVersion
 httpVersion = string "HTTP/" *> 
               ((,) <$> (num <* sep) <*> num)
- where num = many1 digit >>= return . read
+ where num = many1 digit >>= return . read . C.unpack . W.pack
        sep = word8 . c2w $ '.'
 
