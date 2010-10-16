@@ -6,10 +6,13 @@
   #-}
 
 {-
+
+  http://www.ietf.org/rfc/rfc3986.txt
+
   TODO: implement ipv6 and ipvfuture
 -}
 
-module Network.Http.Parser.Rfc2396 where
+module Network.Http.Parser.Rfc3986 where
 
 import Control.Applicative hiding (many)
 import Data.Attoparsec as AW
@@ -34,7 +37,7 @@ data URI = URI
     , uriPath       :: String
     , uriQuery      :: String
     , uriFragment   :: String
-    } deriving (Eq, Typeable, Data)
+    } deriving (Eq, Typeable, Data, Show)
 
 data URIAuth = URIAuth
     { uriUserInfo   :: String
@@ -195,36 +198,36 @@ appcon l ls = l ++ Prelude.concat ls
 word8l w = (:[]) <$> word8 w
 toRepr = C.unpack . W.pack
 
-instance Show URI where
-    showsPrec _ uri = uriToString defaultUserInfoMap uri
+-- instance Show URI where
+--     showsPrec _ uri = uriToString defaultUserInfoMap uri
 
-defaultUserInfoMap :: String -> String
-defaultUserInfoMap uinf = user++newpass
-    where
-        (user,pass) = Prelude.break (==':') uinf
-        newpass     = if Prelude.null pass || (pass == "@")
-                                           || (pass == ":@")
-                        then pass
-                        else ":...@"
+-- defaultUserInfoMap :: String -> String
+-- defaultUserInfoMap uinf = user++newpass
+--     where
+--         (user,pass) = Prelude.break (==':') uinf
+--         newpass     = if Prelude.null pass || (pass == "@")
+--                                            || (pass == ":@")
+--                         then pass
+--                         else ":...@"
 
-uriToString :: (String -> String) -> URI -> ShowS
-uriToString userinfomap URI { uriScheme = scheme
-                            , uriAuthority=authority
-                            , uriPath=path
-                            , uriQuery=query
-                            , uriFragment=fragment
-                            } =
-  (scheme++) . (uriAuthToString userinfomap authority)
-                 . (path++) . (query++) . (fragment++)
+-- uriToString :: (String -> String) -> URI -> ShowS
+-- uriToString userinfomap URI { uriScheme = scheme
+--                             , uriAuthority=authority
+--                             , uriPath=path
+--                             , uriQuery=query
+--                             , uriFragment=fragment
+--                             } =
+--   (scheme++) . (uriAuthToString userinfomap authority)
+--                  . (path++) . (query++) . (fragment++)
 
-uriAuthToString :: (String->String) -> (Maybe URIAuth) -> ShowS
-uriAuthToString _           Nothing   = id          -- shows ""
-uriAuthToString userinfomap
-        (Just URIAuth { uriUserInfo = uinfo
-                      , uriRegName  = regname
-                      , uriPort     = port
-                      } ) =
-    ("//"++) . (if Prelude.null uinfo then id else ((userinfomap uinfo)++))
-             . (regname++)
-             . (":"++)
-             . (port++)
+-- uriAuthToString :: (String->String) -> (Maybe URIAuth) -> ShowS
+-- uriAuthToString _           Nothing   = id          -- shows ""
+-- uriAuthToString userinfomap
+--         (Just URIAuth { uriUserInfo = uinfo
+--                       , uriRegName  = regname
+--                       , uriPort     = port
+--                       } ) =
+--     ("//"++) . (if Prelude.null uinfo then id else ((userinfomap uinfo)++))
+--              . (regname++)
+--              . (":"++)
+--              . (port++)
