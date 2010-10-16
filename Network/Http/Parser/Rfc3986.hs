@@ -131,7 +131,7 @@ userinfo = do
 
 authority :: Parser (Maybe URIAuth)
 authority = do
-  uu <- try userinfo
+  uu <- option [] (try userinfo)
   uh <- host
   up <- option [] (word8 58 *> port)
   return . Just $ URIAuth
@@ -168,8 +168,9 @@ relativeRef = do
 
 hierPart :: Parser ((Maybe URIAuth), [Word8])
 hierPart = do try (word8 47 *> word8 47)
-              ap <- (,) <$> authority <*> pathAbempty
-              return ap
+              uu <- option Nothing authority
+              pa <- pathAbempty
+              return (uu,pa)
        <|> ((Nothing,) <$> pathAbsolute)
        <|> ((Nothing,) <$> pathRootless)
        <|> pure (Nothing, [])
@@ -191,8 +192,8 @@ absoluteUri = do
                }
 
 uri = do
-  us <- try scheme
-  a2 <- word8 58
+  us <- scheme
+  word8 58
   (ua,up) <- hierPart
   uq <- option [] (word8 63 *> query)
   uf <- option [] (word8 35 *> fragment)
@@ -244,4 +245,5 @@ uriAuthToString userinfomap
                       } ) =
     ("//"++) . (if Prelude.null uinfo then id else ((userinfomap uinfo)++))
              . (regname++)
+             . (":"++)
              . (port++)
