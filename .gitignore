@@ -1,0 +1,10 @@
+*~
+dist/
+.hpc
+*.prof
+*.hi
+*.o
+*.swp
+#*#
+.#*
+test/*.log
