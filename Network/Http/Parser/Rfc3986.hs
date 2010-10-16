@@ -125,15 +125,15 @@ port = many R2616.digit
 -- host = ipLiteral <|> ipv4address <|> regName
 host = regName <|> ipv4address
 userinfo = do
-  uu <- many (uchar ";:&=+$,") 
+  uu <- many (unreserved <|> pctEncoded <|> subDelims <|> word8 58)
   word8 64
-  return $ uu ++ [64]
+  return uu
 
 authority :: Parser (Maybe URIAuth)
 authority = do
-  uu <- try (userinfo <* word8 64)
+  uu <- try userinfo
   uh <- host
-  up <- try (word8 58 *> port)
+  up <- option [] (word8 58 *> port)
   return . Just $ URIAuth
             { uriUserInfo = C.unpack $ W.pack uu
             , uriRegName  = C.unpack $ W.pack uh
@@ -211,7 +211,6 @@ appcon :: [a] -> [[a]] -> [a]
 appcon l ls = l ++ Prelude.concat ls
 word8l w = (:[]) <$> word8 w
 toRepr = C.unpack . W.pack
-
 
 instance Show URI where
     showsPrec _ uri = uriToString defaultUserInfoMap uri
