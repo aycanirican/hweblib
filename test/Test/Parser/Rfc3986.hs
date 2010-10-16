@@ -7,6 +7,9 @@ import Test.Parser.Parser
 import Test.HUnit
 import Network.Http.Parser.Rfc3986
 
+tests = TestList $ fmap TestCase lst
+
+lst = [test_uri]
 test_uri 
     = let i = "http://user:pass@www.core.gen.tr/dir1/file.ext?param1=val1&param2=val2 "
           o = Just $ URI { uriScheme = "http"

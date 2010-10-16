@@ -12,6 +12,9 @@ import Network.Http.Parser.Rfc2616
 ae t a b = assertEqual t a b
 p = Just . W.unpack . C.pack
 
+tests = TestList $ fmap TestCase lst
+
+lst = [test_octet, test_char, test_upalpha, test_loalpha, test_lws, test_quotedString]
 -- Tests
 
 test_octet = ae "octet" (Just 48) (aP octet "01")
