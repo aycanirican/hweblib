@@ -82,17 +82,10 @@ pctEncoded = cat <$> word8 37
 {-# INLINE pctEncoded #-}
 
 uchar extras = unreserved <|> pctEncoded <|> subDelims <|> AW.satisfy (AW.inClass extras)
-
-pchar :: Parser Word8
 pchar = uchar ":@"
-
 fragment :: Parser [Word8]
-fragment = do s <- many $ uchar ":@/?"
-              return $ 35:s
-
-query = do s <- many $ uchar ":@/?"
-           return $ 63:s
-
+fragment = (35:) <$> many (uchar ":@/?")
+query = (63:) <$> many (uchar ":@/?")
 segment, segmentNz, segmentNzNc, slashSegment :: Parser [Word8]
 segment = many pchar
 segmentNz = many1 pchar
@@ -102,7 +95,6 @@ pathRootless = appcon <$> segmentNz <*> many slashSegment
 pathNoscheme = appcon <$> segmentNzNc <*> many slashSegment
 pathAbsolute = (:) <$> word8 47 <*> option [] pathRootless
 pathAbempty = Prelude.concat <$> many slashSegment
-
 regName = many (unreserved <|> pctEncoded <|> subDelims)
 
 decOctet :: Parser [Word8]
@@ -143,22 +135,17 @@ authority = do
 scheme = (:) <$> R2616.alpha <*> many (R2616.alpha <|> R2616.digit <|> AW.satisfy (AW.inClass "+-."))
 
 relativePart = do try (word8 47 *> word8 47)
-                  a3 <- (,) <$> authority <*> pathAbempty
-                  return a3 
+                  uu <- option Nothing authority
+                  pa <- pathAbempty
+                  return (uu,pa) 
           <|> ((Nothing,) <$> pathAbsolute)
           <|> ((Nothing,) <$> pathNoscheme)
           <|> pure (Nothing, [])
 
 relativeRef = do
   (ua,up) <- relativePart
-  uq <- try (do x <- word8 63
-                y <- query
-                return $ x:y
-            )
-  uf <- try (do x <- word8 35
-                y <- fragment
-                return $ x:y
-            )
+  uq <- option [] (word8 63 *> query)
+  uf <- option [] (word8 35 *> fragment)
   return $ URI { uriScheme = toRepr []
                , uriAuthority = ua
                , uriPath = toRepr up
@@ -178,12 +165,9 @@ hierPart = do try (word8 47 *> word8 47)
 absoluteUri :: Parser URI
 absoluteUri = do
   us <- scheme
-  b <- word8 58
+  word8 58
   (ua,up) <- hierPart
-  uq <- try (do x <- word8 63
-                y <- query
-                return $ x:y
-            )
+  uq <- option [] (word8 63 *> query)
   return $ URI { uriScheme = toRepr us
                , uriAuthority = ua
                , uriPath = toRepr up
@@ -205,9 +189,7 @@ uri = do
          , uriFragment = toRepr uf
          }
 
-
 -- | Utility
-
 appcon :: [a] -> [[a]] -> [a]
 appcon l ls = l ++ Prelude.concat ls
 word8l w = (:[]) <$> word8 w
@@ -215,7 +197,6 @@ toRepr = C.unpack . W.pack
 
 instance Show URI where
     showsPrec _ uri = uriToString defaultUserInfoMap uri
-
 
 defaultUserInfoMap :: String -> String
 defaultUserInfoMap uinf = user++newpass
