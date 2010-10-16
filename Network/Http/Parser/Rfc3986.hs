@@ -29,7 +29,7 @@ import Data.List (concat)
 import Prelude hiding (take, takeWhile)
 import Data.Typeable (Typeable)
 import Data.Data (Data)
-import qualified Network.Http.Parser.Rfc2616 as R2616
+import qualified Network.Http.Parser.RfcCommon as RC
 
 data URI = URI
     { uriScheme     :: String
@@ -71,12 +71,12 @@ reserved :: Parser Word8
 reserved = AW.satisfy isReserved
 
 unreserved :: Parser Word8
-unreserved = R2616.alpha <|> R2616.digit <|> AW.satisfy (AW.inClass "-._~")
+unreserved = RC.alpha <|> RC.digit <|> AW.satisfy (AW.inClass "-._~")
 
 pctEncoded :: Parser Word8
 pctEncoded = cat <$> word8 37 
-             <*> AW.satisfy R2616.hex_pred
-             <*> AW.satisfy R2616.hex_pred
+             <*> AW.satisfy RC.hex_pred
+             <*> AW.satisfy RC.hex_pred
   where 
     cat _ b c = toTen b * 16 + toTen c
     toTen w | w >= 48 && w <= 57  =  fromIntegral (w - 48)
@@ -102,7 +102,7 @@ regName = many (unreserved <|> pctEncoded <|> subDelims)
 
 decOctet :: Parser [Word8]
 decOctet = do
-  x <- many R2616.digit
+  x <- many RC.digit
   if read (C.unpack . W.pack $ x) > 255 
     then fail "error decOctet"
     else return x
@@ -114,7 +114,7 @@ ipv4address = ret <$> decOctet <* word8 46
                   <*> decOctet
   where ret a b c d = a++[46]++b++[46]++c++[46]++d
 
-port = many R2616.digit
+port = many RC.digit
 
 -- TODO: IP-literal
 -- host = ipLiteral <|> ipv4address <|> regName
@@ -135,7 +135,7 @@ authority = do
             , uriPort     = C.unpack $ W.pack up
             }
 
-scheme = (:) <$> R2616.alpha <*> many (R2616.alpha <|> R2616.digit <|> AW.satisfy (AW.inClass "+-."))
+scheme = (:) <$> RC.alpha <*> many (RC.alpha <|> RC.digit <|> AW.satisfy (AW.inClass "+-."))
 
 relativePart = do try (word8 47 *> word8 47)
                   uu <- option Nothing authority

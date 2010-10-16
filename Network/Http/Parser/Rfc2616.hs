@@ -16,18 +16,14 @@ import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8, Word64)
 import Data.Char (digitToInt, isAsciiUpper, isAsciiLower)
 import Prelude hiding (take, takeWhile)
-
-type HttpVersion = (Int,Int)
-
-data Method  = GET | HEAD | POST | PUT | DELETE | TRACE | OPTIONS | CONNECT
-               deriving(Show,Read,Ord,Eq)
+import qualified Network.Http.Parser.Rfc3986 as R3986
+import Network.Http.Parser.RfcCommon
 
 -- | Basic Parser Constructs for RFC 2616
 
-char_pred, upalpha_pred
- , loalpha_pred, alpha_pred, digit_pred, ctl_pred
+char_pred, ctl_pred
  , cr_pred, lf_pred, sp_pred, ht_pred, dquote_pred
- , separators_pred, token_pred, hex_pred
+ , separators_pred, token_pred
  :: Word8 -> Bool
 
 -- parse octet (C.pack "abc") => 97
@@ -40,26 +36,6 @@ char_pred w = w >= 0 || w <= 127
 char :: Parser Word8
 char = AW.satisfy char_pred
 {-# INLINE char #-}
-
-upalpha_pred w = w >= 65 && w <= 90
-upalpha :: Parser Word8
-upalpha = AW.satisfy upalpha_pred
-{-# INLINE upalpha #-}
-
-loalpha_pred w = w >= 97 && w <= 122
-loalpha :: Parser Word8
-loalpha = AW.satisfy loalpha_pred
-{-# INLINE loalpha #-}
-
-alpha_pred w = upalpha_pred w || loalpha_pred w
-alpha :: Parser Word8
-alpha = AW.satisfy alpha_pred
-{-# INLINE alpha #-}
-
-digit_pred w = w >= 48 && w <= 57 
-digit :: Parser Word8
-digit = AW.satisfy digit_pred
-{-# INLINE digit #-}
 
 ctl_pred w = (w == 127) || (w >= 0) && (w < 32)
 ctl :: Parser Word8
@@ -106,13 +82,6 @@ text = crlf <|> AW.satisfy char_not_ctl
   where char_not_ctl w = char_pred w && not (ctl_pred w)
 {-# INLINE text #-}
 
-hex_pred w = (w >= 65 && w <= 70) 
-             || (w >= 97 && w <= 102)
-             || (w >= 48 && w <= 57)
-hex :: Parser [Word8]
-hex = many1 $ AW.satisfy hex_pred
-{-# INLINE hex #-}
-
 token_pred w = char_pred w && not (ctl_pred w || separators_pred w)
 token :: Parser [Word8]
 token = many1 $ AW.satisfy token_pred
@@ -156,13 +125,31 @@ httpVersion = string "HTTP/" *>
 
 
 -- parse (httpMethod) (W.pack "GET /")
-httpMethod :: Parser Method
-httpMethod =  (GET     <$ string "GET")
-          <|> (PUT     <$ string "PUT")
-          <|> (POST    <$ string "POST")
-          <|> (HEAD    <$ string "HEAD")
-          <|> (DELETE  <$ string "DELETE")
-          <|> (TRACE   <$ string "TRACE")
-          <|> (CONNECT <$ string "CONNECT")
-          <|> (OPTIONS <$ string "OPTIONS")
+method :: Parser Method
+method = (GET     <$ string "GET")
+         <|> (PUT     <$ string "PUT")
+         <|> (POST    <$ string "POST")
+         <|> (HEAD    <$ string "HEAD")
+         <|> (DELETE  <$ string "DELETE")
+         <|> (TRACE   <$ string "TRACE")
+         <|> (CONNECT <$ string "CONNECT")
+         <|> (OPTIONS <$ string "OPTIONS")
 
+-- requestLine :: Parser (Method, URI, HttpVersion)
+requestLine = ret <$> method      <* sp
+                  <*> R3986.uri   <* sp
+                  <*> httpVersion <* crlf
+    where ret m u h = (m,u,h)
+
+-- data GenericMessage = GenericMessage
+--     { 
+
+-- data HttpMessage = Request | Response
+data Header = GeneralHeader | RequestHeader | EntityHeader
+data Request = Request
+    { body :: Maybe ByteString }
+
+type HttpVersion = (Int,Int)
+
+data Method  = GET | HEAD | POST | PUT | DELETE | TRACE | OPTIONS | CONNECT
+               deriving(Show,Read,Ord,Eq)
