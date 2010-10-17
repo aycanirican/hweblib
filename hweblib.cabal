@@ -12,7 +12,10 @@ Cabal-version:       >=1.6
 
 Library
   -- Modules exported by the library.
-  Exposed-modules: Network.Http.Parser.Rfc2616
+  Exposed-modules: 
+    Network.Http.Parser.RfcCommon
+    , Network.Http.Parser.Rfc3986
+    , Network.Http.Parser.Rfc2616 
   
   -- Packages needed in order to build this package.
   Build-depends:
@@ -23,10 +26,6 @@ Library
     , transformers
     , attoparsec
 
-  
-  -- Modules not exported by this package.
-  -- Other-modules:       
-  
-  -- Extra tools (e.g. alex, hsc2hs, ...) needed to build the source.
-  -- Build-tools:         
-  
+source-repository head
+  type:     git
+  location: git://github.com/aycanirican/hweblib.git
