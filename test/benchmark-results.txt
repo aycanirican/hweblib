@@ -1,0 +1,31 @@
+*** 20101018 
+warming up
+estimating clock resolution...
+mean is 8.437557 us (80001 iterations)
+found 1491 outliers among 79999 samples (1.9%)
+  1387 (1.7%) high severe
+estimating cost of a clock call...
+mean is 149.2855 ns (72 iterations)
+found 3 outliers among 72 samples (4.2%)
+  3 (4.2%) high mild
+
+benchmarking rfc2616/request
+collecting 100 samples, 138 iterations each, in estimated 849.6752 ms
+bootstrapping with 100000 resamples
+mean: 62.39512 us, lb 62.34652 us, ub 62.45033 us, ci 0.950
+std dev: 266.9579 ns, lb 218.5086 ns, ub 379.4546 ns, ci 0.950
+found 2 outliers among 100 samples (2.0%)
+  1 (1.0%) high severe
+variance introduced by outliers: 0.990%
+variance is unaffected by outliers
+
+benchmarking rfc3986/uri
+collecting 100 samples, 92 iterations each, in estimated 845.4725 ms
+bootstrapping with 100000 resamples
+mean: 91.18866 us, lb 91.10092 us, ub 91.29256 us, ci 0.950
+std dev: 488.6876 ns, lb 412.9587 ns, ub 595.7354 ns, ci 0.950
+found 3 outliers among 100 samples (3.0%)
+  3 (3.0%) high mild
+variance introduced by outliers: 0.990%
+variance is unaffected by outliers
+
