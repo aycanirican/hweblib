@@ -24,9 +24,20 @@ Executable hweblib-test
     , monads-fd
     , transformers
     , attoparsec
-    , criterion
     , HUnit
 
+Executable hweblib-benchmark
+  hs-source-dirs: ./ ../
+  main-is: Benchmark.hs
+  Build-depends:
+    base >= 4 && < 5
+    , containers
+    , bytestring
+    , monads-fd
+    , transformers
+    , attoparsec
+    , criterion
+    , HUnit
   
   -- Modules not exported by this package.
   -- Other-modules:       

@@ -124,27 +124,32 @@ comment = word8 40 *> many (quotedPair <|> ctext) <* word8 41
 
 -- parse (httpVersion) (W.pack "HTTP/12.15\n")
 httpVersion :: Parser HttpVersion
-httpVersion = stringCI "HTTP/" *> 
+httpVersion = stringCI "http/" *> 
               ((,) <$> (num <* sep) <*> num)
  where num = many1 digit >>= return . read . C.unpack . W.pack
        sep = word8 . c2w $ '.'
 
 
--- parse (httpMethod) (W.pack "GET /")
+-- parse (method) (W.pack "GET /")
 method :: Parser Method
-method = (GET         <$ stringCI "GET")
-         <|> (PUT     <$ stringCI "PUT")
-         <|> (POST    <$ stringCI "POST")
-         <|> (HEAD    <$ stringCI "HEAD")
-         <|> (DELETE  <$ stringCI "DELETE")
-         <|> (TRACE   <$ stringCI "TRACE")
-         <|> (CONNECT <$ stringCI "CONNECT")
-         <|> (OPTIONS <$ stringCI "OPTIONS")
+method = (GET         <$ stringCI "get")
+         <|> (PUT     <$ stringCI "put")
+         <|> (POST    <$ stringCI "post")
+         <|> (HEAD    <$ stringCI "head")
+         <|> (DELETE  <$ stringCI "delete")
+         <|> (TRACE   <$ stringCI "trace")
+         <|> (CONNECT <$ stringCI "connect")
+         <|> (OPTIONS <$ stringCI "options")
          <|> ((EXTENSIONMETHOD . W.pack) <$> token)
 
-requestLine :: Parser (Method, R3986.URI, HttpVersion)
+requestUri = try (Asterisk <$ word8 42)
+             <|> AbsoluteUri <$> R3986.absoluteUri
+             <|> (AbsolutePath . W.pack) <$> R3986.pathAbsolute
+             <|> Authority <$> R3986.authority 
+
+requestLine :: Parser (Method, RequestUri, HttpVersion)
 requestLine = ret <$> method      <* sp
-                  <*> R3986.uri   <* sp
+                  <*> requestUri  <* sp
                   <*> httpVersion <* crlf
     where ret m u h = (m,u,h)
 
@@ -159,19 +164,30 @@ headerContent = AW.satisfy (\w -> headerContentNc_pred w || w == 58) -- ':'
 headerName = many1 $ AW.satisfy headerContentNc_pred
 headerValue = do
   c <- headerContent
-  r <- option [] (many (headerContent <|> lws))
+  r <- option [] (many (headerContent <|> lws)) -- TODO: http://stuff.gsnedders.com/http-parsing.txt
   return (c:r)
 
-header = ret <$> headerName <* (word8 58 <* lwss)
+header :: Parser (ByteString,ByteString)
+header = ret <$> headerName  <* (word8 58 <* lwss)
              <*> headerValue <* lwss
     where ret n v = (W.pack n, W.pack v)
 
--- request = do 
---   (m,u,v) <- requestLine
---   crlf
---   b <- option [] messageBody
---   return ()
 
+entityBody = many octet
+messageBody = entityBody
+
+request = do
+  (m, ru, v) <- requestLine 
+  hdrs <- many (header <* crlf)
+  crlf
+--  body <- option [] messageBody
+  return $ Request
+             { rqMethod  = m
+             , rqUri     = ru
+             , rqVersion = v
+             , rqHeaders = hdrs
+             , rqBody    = W.empty -- W.pack body
+             }
 
 -- data GenericMessage = GenericMessage
 --     { 
@@ -179,14 +195,22 @@ header = ret <$> headerName <* (word8 58 <* lwss)
 -- data HttpMessage = Request | Response
 data Header = GeneralHeader | RequestHeader | EntityHeader
 
--- data Request = Request
---     { rqMethod  :: Method
---       rqVersion :: (Int,Int)
---     , rqBody    :: Maybe ByteString 
---     }
+data Request = Request
+    { rqMethod  :: Method
+    , rqUri     :: RequestUri
+    , rqVersion :: (Int, Int)
+    , rqHeaders :: [(ByteString, ByteString)]
+    , rqBody    :: ByteString 
+    } deriving (Eq, Show)
 
 type HttpVersion = (Int,Int)
 data Method = GET | HEAD | POST | PUT | DELETE 
             | TRACE | OPTIONS | CONNECT 
             | EXTENSIONMETHOD ByteString
               deriving (Show,Read,Ord,Eq)
+
+data RequestUri = Asterisk 
+                | AbsoluteUri R3986.URI
+                | AbsolutePath ByteString
+                | Authority (Maybe R3986.URIAuth)
+                  deriving (Eq, Show)

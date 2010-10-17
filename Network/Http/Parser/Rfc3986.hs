@@ -192,6 +192,8 @@ uri = do
          , uriFragment = RC.toRepr uf
          }
 
+uriReference = uri <|> relativeRef
+
 -- | Utility
 
 -- instance Show URI where
