@@ -18,7 +18,7 @@ import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8, Word64)
 import Data.Char (digitToInt, isAsciiUpper, isAsciiLower)
-import Data.List (concat)
+import Control.Monad (join)
 import Prelude hiding (take, takeWhile)
 import Data.Typeable (Typeable)
 import Data.Data (Data)
@@ -53,3 +53,9 @@ hex_pred w = (w >= 65 && w <= 70)
 hex :: Parser [Word8]
 hex = many1 $ AW.satisfy hex_pred
 {-# INLINE hex #-}
+
+-- | Utilities
+appcon :: [a] -> [[a]] -> [a]
+appcon = (. join) . (++)
+word8l w = (:[]) <$> word8 w
+toRepr = C.unpack . W.pack

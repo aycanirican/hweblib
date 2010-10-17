@@ -94,8 +94,8 @@ segment = many pchar
 segmentNz = many1 pchar
 segmentNzNc = many1 $ uchar "@"
 slashSegment = (:) <$> word8 47 <*> segment
-pathRootless = appcon <$> segmentNz <*> many slashSegment
-pathNoscheme = appcon <$> segmentNzNc <*> many slashSegment
+pathRootless = RC.appcon <$> segmentNz <*> many slashSegment
+pathNoscheme = RC.appcon <$> segmentNzNc <*> many slashSegment
 pathAbsolute = (:) <$> word8 47 <*> option [] pathRootless
 pathAbempty = Prelude.concat <$> many slashSegment
 regName = many (unreserved <|> pctEncoded <|> subDelims)
@@ -149,11 +149,11 @@ relativeRef = do
   (ua,up) <- relativePart
   uq <- option [] (word8 63 *> query)
   uf <- option [] (word8 35 *> fragment)
-  return $ URI { uriScheme = toRepr []
+  return $ URI { uriScheme = RC.toRepr []
                , uriAuthority = ua
-               , uriPath = toRepr up
-               , uriQuery = toRepr uq
-               , uriFragment = toRepr uf
+               , uriPath = RC.toRepr up
+               , uriQuery = RC.toRepr uq
+               , uriFragment = RC.toRepr uf
                }
 
 hierPart :: Parser ((Maybe URIAuth), [Word8])
@@ -171,11 +171,11 @@ absoluteUri = do
   word8 58
   (ua,up) <- hierPart
   uq <- option [] (word8 63 *> query)
-  return $ URI { uriScheme = toRepr us
+  return $ URI { uriScheme = RC.toRepr us
                , uriAuthority = ua
-               , uriPath = toRepr up
-               , uriQuery = toRepr uq
-               , uriFragment = toRepr []
+               , uriPath = RC.toRepr up
+               , uriQuery = RC.toRepr uq
+               , uriFragment = RC.toRepr []
                }
 
 uri = do
@@ -185,18 +185,14 @@ uri = do
   uq <- option [] (word8 63 *> query)
   uf <- option [] (word8 35 *> fragment)
   return $ URI
-         { uriScheme = toRepr us
+         { uriScheme = RC.toRepr us
          , uriAuthority = ua
-         , uriPath = toRepr up
-         , uriQuery = toRepr uq
-         , uriFragment = toRepr uf
+         , uriPath = RC.toRepr up
+         , uriQuery = RC.toRepr uq
+         , uriFragment = RC.toRepr uf
          }
 
 -- | Utility
-appcon :: [a] -> [[a]] -> [a]
-appcon l ls = l ++ Prelude.concat ls
-word8l w = (:[]) <$> word8 w
-toRepr = C.unpack . W.pack
 
 -- instance Show URI where
 --     showsPrec _ uri = uriToString defaultUserInfoMap uri

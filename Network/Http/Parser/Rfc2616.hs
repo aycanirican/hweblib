@@ -14,7 +14,7 @@ import Data.ByteString as W
 import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8, Word64)
-import Data.Char (digitToInt, isAsciiUpper, isAsciiLower)
+import Data.Char (digitToInt, chr, ord)
 import Prelude hiding (take, takeWhile)
 import qualified Network.Http.Parser.Rfc3986 as R3986
 import Network.Http.Parser.RfcCommon
@@ -71,11 +71,16 @@ crlf :: Parser Word8
 crlf = try (cr *> lf) <|> lf <?> "crlf or lf"
 {-# INLINE crlf #-}
 
--- parse lws (C.pack "\n\t  asd")
+-- parse lws and return space
 lws :: Parser Word8
 lws = (try (crlf *> s) <|> s) *> return 32 <?> "lightweight space"
   where s = many1 (sp <|> ht)
 {-# INLINE lws #-}
+
+-- consecutive matches of lws rule, where they MUST be compressed to a
+-- single 0x20 byte
+lwss :: Parser Word8
+lwss = do many lws; return 32
 
 text :: Parser Word8
 text = crlf <|> AW.satisfy char_not_ctl
@@ -87,6 +92,7 @@ token :: Parser [Word8]
 token = many1 $ AW.satisfy token_pred
 {-# INLINE token #-}
 
+-- "()<>@,;:\\\"/[]?={} \t"
 separatorSet :: [Word8]
 separatorSet = [40,41,60,62,64,44,59,58,92,34,47,91,93,63,61,123,125,32,9]
 separators_pred w = AF.memberWord8 w (AF.fromList separatorSet)
@@ -118,7 +124,7 @@ comment = word8 40 *> many (quotedPair <|> ctext) <* word8 41
 
 -- parse (httpVersion) (W.pack "HTTP/12.15\n")
 httpVersion :: Parser HttpVersion
-httpVersion = string "HTTP/" *> 
+httpVersion = stringCI "HTTP/" *> 
               ((,) <$> (num <* sep) <*> num)
  where num = many1 digit >>= return . read . C.unpack . W.pack
        sep = word8 . c2w $ '.'
@@ -126,30 +132,61 @@ httpVersion = string "HTTP/" *>
 
 -- parse (httpMethod) (W.pack "GET /")
 method :: Parser Method
-method = (GET     <$ string "GET")
-         <|> (PUT     <$ string "PUT")
-         <|> (POST    <$ string "POST")
-         <|> (HEAD    <$ string "HEAD")
-         <|> (DELETE  <$ string "DELETE")
-         <|> (TRACE   <$ string "TRACE")
-         <|> (CONNECT <$ string "CONNECT")
-         <|> (OPTIONS <$ string "OPTIONS")
+method = (GET         <$ stringCI "GET")
+         <|> (PUT     <$ stringCI "PUT")
+         <|> (POST    <$ stringCI "POST")
+         <|> (HEAD    <$ stringCI "HEAD")
+         <|> (DELETE  <$ stringCI "DELETE")
+         <|> (TRACE   <$ stringCI "TRACE")
+         <|> (CONNECT <$ stringCI "CONNECT")
+         <|> (OPTIONS <$ stringCI "OPTIONS")
+         <|> ((EXTENSIONMETHOD . W.pack) <$> token)
 
--- requestLine :: Parser (Method, URI, HttpVersion)
+requestLine :: Parser (Method, R3986.URI, HttpVersion)
 requestLine = ret <$> method      <* sp
                   <*> R3986.uri   <* sp
                   <*> httpVersion <* crlf
     where ret m u h = (m,u,h)
+
+headerContentNc_pred w 
+       = (w >= 0x00 && w <= 0x08)
+      || (w >= 0x0b && w <= 0x0c)
+      || (w >= 0x0e && w <= 0x1f)
+      || (w >= 0x21 && w <= 0x39)
+      || (w >= 0x3b && w <= 0xff)
+
+headerContent = AW.satisfy (\w -> headerContentNc_pred w || w == 58) -- ':'
+headerName = many1 $ AW.satisfy headerContentNc_pred
+headerValue = do
+  c <- headerContent
+  r <- option [] (many (headerContent <|> lws))
+  return (c:r)
+
+header = ret <$> headerName <* (word8 58 <* lwss)
+             <*> headerValue <* lwss
+    where ret n v = (W.pack n, W.pack v)
+
+-- request = do 
+--   (m,u,v) <- requestLine
+--   crlf
+--   b <- option [] messageBody
+--   return ()
+
 
 -- data GenericMessage = GenericMessage
 --     { 
 
 -- data HttpMessage = Request | Response
 data Header = GeneralHeader | RequestHeader | EntityHeader
-data Request = Request
-    { body :: Maybe ByteString }
+
+-- data Request = Request
+--     { rqMethod  :: Method
+--       rqVersion :: (Int,Int)
+--     , rqBody    :: Maybe ByteString 
+--     }
 
 type HttpVersion = (Int,Int)
-
-data Method  = GET | HEAD | POST | PUT | DELETE | TRACE | OPTIONS | CONNECT
-               deriving(Show,Read,Ord,Eq)
+data Method = GET | HEAD | POST | PUT | DELETE 
+            | TRACE | OPTIONS | CONNECT 
+            | EXTENSIONMETHOD ByteString
+              deriving (Show,Read,Ord,Eq)
