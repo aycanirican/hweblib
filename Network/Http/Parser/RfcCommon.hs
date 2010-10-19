@@ -22,37 +22,49 @@ import Control.Monad (join)
 import Prelude hiding (take, takeWhile)
 import Data.Typeable (Typeable)
 import Data.Data (Data)
+import Network.Http.Parser.Rfc2234
 
+----
+-- * Common Parsers
+----
 
-upalpha_pred, loalpha_pred, alpha_pred, digit_pred, hex_pred
- :: Word8 -> Bool
-
-upalpha_pred w = w >= 65 && w <= 90
-upalpha :: Parser Word8
-upalpha = AW.satisfy upalpha_pred
-{-# INLINE upalpha #-}
-
-loalpha_pred w = w >= 97 && w <= 122
-loalpha :: Parser Word8
-loalpha = AW.satisfy loalpha_pred
-{-# INLINE loalpha #-}
-
-alpha_pred w = upalpha_pred w || loalpha_pred w
-alpha :: Parser Word8
-alpha = AW.satisfy alpha_pred
-{-# INLINE alpha #-}
-
-digit_pred w = w >= 48 && w <= 57 
-digit :: Parser Word8
-digit = AW.satisfy digit_pred
-{-# INLINE digit #-}
-
-hex_pred w = (w >= 65 && w <= 70) 
-             || (w >= 97 && w <= 102)
-             || (w >= 48 && w <= 57)
 hex :: Parser [Word8]
-hex = many1 $ AW.satisfy hex_pred
+hex = many1 hexdig
 {-# INLINE hex #-}
+
+-- parse lws and return space
+lws :: Parser Word8
+lws = (try (crlf *> s) <|> s) *> return 32 <?> "lightweight space"
+  where s = many1 (sp <|> ht)
+{-# INLINE lws #-}
+
+-- consecutive matches of lws rule, where they MUST be compressed to a
+-- single 0x20 byte
+lwss :: Parser Word8
+lwss = do many lws; return 32
+{-# INLINE lwss #-}
+
+ctext :: Parser Word8
+ctext = crlf <|> AW.satisfy char_not_ctl_or_paren
+  where 
+    char_not_ctl_or_paren w 
+        = char_pred w && not (w == 40 || w == 41) && not (ctl_pred w)
+{-# INLINE ctext #-}
+
+qdtext :: Parser Word8
+qdtext = crlf <|> AW.satisfy char_not_ctl_or_dquote
+  where 
+    char_not_ctl_or_dquote w 
+        = char_pred w && not (dquote_pred w) && not (ctl_pred w)
+{-# INLINE qdtext #-}
+
+quotedPair :: Parser Word8
+quotedPair = word8 92 *> char
+{-# INLINE quotedPair #-}
+
+quotedString :: Parser [Word8]
+quotedString = word8 34 *> many (quotedPair <|> qdtext) <* word8 34
+{-# INLINE quotedString #-}
 
 -- | Utilities
 appcon :: [a] -> [[a]] -> [a]

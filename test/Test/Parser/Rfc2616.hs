@@ -22,10 +22,6 @@ parseGetData = C.concat
                , "Connection: keep-alive\r\n"
                , "\r\n" ]
 
--- Utils
-ae t a b = assertEqual t a b
-p = Just . W.unpack . C.pack
-
 tests = TestList $ fmap TestCase lst
 
 lst = [test_octet, test_char, test_upalpha, test_loalpha, test_lws, test_quotedString, test_requestline, test_requestline2]

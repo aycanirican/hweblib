@@ -18,3 +18,4 @@ rfc3986 = bgroup "rfc3986"
 
 rfc2616 = bgroup "rfc2616"
           [ bench "request" $ whnf (parse request) parseGetData]
+
