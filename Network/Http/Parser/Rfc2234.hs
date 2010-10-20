@@ -35,8 +35,8 @@ octet :: Parser Word8
 octet = anyWord8
 {-# INLINE octet #-}
 
-lwsp :: Parser Word8
-lwsp = many (wsp <|> crlf *> wsp) *> return 32 <?> "lightweight space"
+lwsp :: Parser [Word8]
+lwsp = many (wsp <|> crlf *> wsp) <?> "lightweight space"
 {-# INLINE lwsp #-}
 
 lf_pred = (== 10)

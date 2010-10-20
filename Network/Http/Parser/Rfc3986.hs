@@ -15,9 +15,8 @@
 module Network.Http.Parser.Rfc3986 where
 
 import Control.Applicative hiding (many)
-import Data.Attoparsec as AW
-import Data.Attoparsec.Combinator as DACO
-import Data.Attoparsec.Char8 as AC hiding (digit, char)
+import Data.Attoparsec
+--import Data.Attoparsec.Char8
 import qualified Data.Attoparsec.Char8 as DAC
 import qualified Data.Attoparsec.FastSet as AF
 import Data.ByteString as W
@@ -30,6 +29,7 @@ import Prelude hiding (take, takeWhile)
 import Data.Typeable (Typeable)
 import Data.Data (Data)
 import qualified Network.Http.Parser.RfcCommon as RC
+import Network.Http.Parser.Rfc2234
 
 data URI = URI
     { uriScheme     :: String
@@ -58,25 +58,25 @@ nullURI = URI
 subDelimsSet = [33,36,38,39,40,41,42,43,44,59,61]
 isSubDelims w = AF.memberWord8 w $ AF.fromList subDelimsSet
 subDelims :: Parser Word8
-subDelims =  AW.satisfy isSubDelims
+subDelims =  satisfy isSubDelims
 
 -- Prelude.map ord ":/?#[]@"
 genDelimsSet = [58,47,63,35,91,93,64]
 isGenDelims w = AF.memberWord8 w $ AF.fromList genDelimsSet
 genDelims :: Parser Word8
-genDelims =  AW.satisfy isGenDelims
+genDelims =  satisfy isGenDelims
 
 isReserved w = isGenDelims w || isSubDelims w
 reserved :: Parser Word8
-reserved = AW.satisfy isReserved
+reserved = satisfy isReserved
 
 unreserved :: Parser Word8
-unreserved = RC.alpha <|> RC.digit <|> AW.satisfy (AW.inClass "-._~")
+unreserved = alpha <|> digit <|> satisfy (inClass "-._~")
 
 pctEncoded :: Parser Word8
 pctEncoded = cat <$> word8 37 
-             <*> AW.satisfy RC.hex_pred
-             <*> AW.satisfy RC.hex_pred
+             <*> satisfy hexdig_pred
+             <*> satisfy hexdig_pred
   where 
     cat _ b c = toTen b * 16 + toTen c
     toTen w | w >= 48 && w <= 57  =  fromIntegral (w - 48)
@@ -84,7 +84,7 @@ pctEncoded = cat <$> word8 37
             | otherwise           =  fromIntegral (w - 55)
 {-# INLINE pctEncoded #-}
 
-uchar extras = unreserved <|> pctEncoded <|> subDelims <|> AW.satisfy (AW.inClass extras)
+uchar extras = unreserved <|> pctEncoded <|> subDelims <|> satisfy (inClass extras)
 pchar = uchar ":@"
 fragment :: Parser [Word8]
 fragment = (35:) <$> many (uchar ":@/?")
@@ -102,7 +102,7 @@ regName = many (unreserved <|> pctEncoded <|> subDelims)
 
 decOctet :: Parser [Word8]
 decOctet = do
-  x <- many RC.digit
+  x <- many digit
   if read (C.unpack . W.pack $ x) > 255 
     then fail "error decOctet"
     else return x
@@ -114,7 +114,7 @@ ipv4address = ret <$> decOctet <* word8 46
                   <*> decOctet
   where ret a b c d = a++[46]++b++[46]++c++[46]++d
 
-port = many RC.digit
+port = many digit
 
 -- TODO: IP-literal
 -- host = ipLiteral <|> ipv4address <|> regName
@@ -135,7 +135,7 @@ authority = do
             , uriPort     = C.unpack $ W.pack up
             }
 
-scheme = (:) <$> RC.alpha <*> many (RC.alpha <|> RC.digit <|> AW.satisfy (AW.inClass "+-."))
+scheme = (:) <$> alpha <*> many (alpha <|> digit <|> satisfy (inClass "+-."))
 
 relativePart = do try (word8 47 *> word8 47)
                   uu <- option Nothing authority

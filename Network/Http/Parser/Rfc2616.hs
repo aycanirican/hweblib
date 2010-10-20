@@ -6,18 +6,17 @@
 module Network.Http.Parser.Rfc2616 where
 
 import Control.Applicative hiding (many)
-import Data.Attoparsec as AW
-import Data.Attoparsec.Char8 as AC hiding (digit, char)
-import qualified Data.Attoparsec.Char8 as DAC
-import qualified Data.Attoparsec.FastSet as AF
+import Data.Attoparsec
+import Data.Attoparsec.FastSet (memberWord8, fromList)
+import Data.Attoparsec.Char8 (stringCI)
 import Data.ByteString as W
 import Data.ByteString.Char8 as C
-import Data.ByteString.Internal (c2w, w2c)
-import Data.Word (Word8, Word64)
-import Data.Char (digitToInt, chr, ord)
+import Data.ByteString.Internal (c2w)
+import Data.Word (Word8())
 import Prelude hiding (take, takeWhile)
 import qualified Network.Http.Parser.Rfc3986 as R3986
 import Network.Http.Parser.RfcCommon
+import Network.Http.Parser.Rfc2234
 
 -- | Basic Parser Constructs for RFC 2616
 
@@ -25,21 +24,21 @@ separators_pred, token_pred
  :: Word8 -> Bool
 
 text :: Parser Word8
-text = crlf <|> AW.satisfy char_not_ctl
+text = crlf <|> satisfy char_not_ctl
   where char_not_ctl w = char_pred w && not (ctl_pred w)
 {-# INLINE text #-}
 
 token_pred w = char_pred w && not (ctl_pred w || separators_pred w)
 token :: Parser [Word8]
-token = many1 $ AW.satisfy token_pred
+token = many1 $ satisfy token_pred
 {-# INLINE token #-}
 
 -- "()<>@,;:\\\"/[]?={} \t"
 separatorSet :: [Word8]
 separatorSet = [40,41,60,62,64,44,59,58,92,34,47,91,93,63,61,123,125,32,9]
-separators_pred w = AF.memberWord8 w (AF.fromList separatorSet)
+separators_pred w = memberWord8 w (fromList separatorSet)
 separators :: Parser Word8
-separators = AW.satisfy separators_pred
+separators = satisfy separators_pred
 {-# INLINE separators #-}
 
 comment :: Parser [Word8]
@@ -83,8 +82,8 @@ headerContentNc_pred w
       || (w >= 0x21 && w <= 0x39)
       || (w >= 0x3b && w <= 0xff)
 
-headerContent = AW.satisfy (\w -> headerContentNc_pred w || w == 58) -- ':'
-headerName = many1 $ AW.satisfy headerContentNc_pred
+headerContent = satisfy (\w -> headerContentNc_pred w || w == 58) -- ':'
+headerName = many1 $ satisfy headerContentNc_pred
 headerValue = do
   c <- headerContent
   r <- option [] (many (headerContent <|> lws)) -- TODO: http://stuff.gsnedders.com/http-parsing.txt
