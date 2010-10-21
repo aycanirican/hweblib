@@ -19,6 +19,9 @@ Library
   -- Modules exported by the library.
   Exposed-modules: 
     Network.Http.Parser.RfcCommon
+    , Network.Http.Parser.Rfc2234
+    , Network.Http.Parser.Rfc2822
+    , Network.Http.Parser.Rfc2045
     , Network.Http.Parser.Rfc3986
     , Network.Http.Parser.Rfc2616 
   

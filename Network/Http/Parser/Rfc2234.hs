@@ -72,7 +72,7 @@ ctl = satisfy ctl_pred <?> "ascii control character"
 {-# INLINE ctl #-}
 
 crlf :: Parser Word8
-crlf = try (cr *> lf) <|> lf <?> "crlf or lf"
+crlf = return 10 <$> (try (cr *> lf) <|> lf)
 {-# INLINE crlf #-}
 
 cr :: Parser Word8
@@ -120,14 +120,3 @@ manyNtoM n m p
     | otherwise = (++) <$> count n p <*> manyNtoM 0 (m - n) p
 
 {-# INLINE manyNtoM #-}
-
--- ** Useful additions
-
--- quotedPair :: Parser Word8
--- quotedPair = word8 92 *> char
--- {-# INLINE quotedPair #-}
-
--- quotedString :: Parser [Word8]
--- quotedString = word8 34 *> many (quotedPair <|> qdtext) <* word8 34
--- {-# INLINE quotedString #-}
-

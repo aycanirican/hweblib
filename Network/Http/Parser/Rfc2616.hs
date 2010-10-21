@@ -9,24 +9,19 @@ import Control.Applicative hiding (many)
 import Data.Attoparsec
 import Data.Attoparsec.FastSet (memberWord8, fromList)
 import Data.Attoparsec.Char8 (stringCI)
-import Data.ByteString as W
-import Data.ByteString.Char8 as C
+import Data.ByteString as W hiding (concat)
+import Data.ByteString.Char8 as C hiding (concat)
 import Data.ByteString.Internal (c2w)
 import Data.Word (Word8())
 import Prelude hiding (take, takeWhile)
 import qualified Network.Http.Parser.Rfc3986 as R3986
 import Network.Http.Parser.RfcCommon
 import Network.Http.Parser.Rfc2234
-
+import Data.List
 -- | Basic Parser Constructs for RFC 2616
 
 separators_pred, token_pred
  :: Word8 -> Bool
-
-text :: Parser Word8
-text = crlf <|> satisfy char_not_ctl
-  where char_not_ctl w = char_pred w && not (ctl_pred w)
-{-# INLINE text #-}
 
 token_pred w = char_pred w && not (ctl_pred w || separators_pred w)
 token :: Parser [Word8]
@@ -42,7 +37,11 @@ separators = satisfy separators_pred
 {-# INLINE separators #-}
 
 comment :: Parser [Word8]
-comment = word8 40 *> many (quotedPair <|> ctext) <* word8 41
+comment = do 
+  word8 40 
+  r <- concat <$> many (quotedPair <|> ((:[]) <$> ctext))
+  word8 41
+  return r
 
 -- parse (httpVersion) (W.pack "HTTP/12.15\n")
 httpVersion :: Parser HttpVersion

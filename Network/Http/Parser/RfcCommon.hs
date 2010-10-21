@@ -41,7 +41,7 @@ lws = (try (crlf *> s) <|> s) *> return 32 <?> "lightweight space"
 -- consecutive matches of lws rule, where they MUST be compressed to a
 -- single 0x20 byte
 lwss :: Parser Word8
-lwss = do many lws; return 32
+lwss = return 32 <$> many lws
 {-# INLINE lwss #-}
 
 ctext :: Parser Word8
@@ -58,16 +58,32 @@ qdtext = crlf <|> AW.satisfy char_not_ctl_or_dquote
         = char_pred w && not (dquote_pred w) && not (ctl_pred w)
 {-# INLINE qdtext #-}
 
-quotedPair :: Parser Word8
-quotedPair = word8 92 *> char
+quotedPair :: Parser [Word8]
+quotedPair = ret <$> word8 92 <*> char
+    where ret a b = a:b:[]
 {-# INLINE quotedPair #-}
 
 quotedString :: Parser [Word8]
-quotedString = word8 34 *> many (quotedPair <|> qdtext) <* word8 34
+quotedString = do
+  word8 34 
+  r <- many (do a <- option [] quotedPair 
+                b <- qdtext
+                return $ a ++ [b]
+            )
+  word8 34
+  return . join $ r
 {-# INLINE quotedString #-}
+
+text :: Parser Word8
+text = crlf <|> AW.satisfy char_not_ctl
+  where char_not_ctl w = char_pred w && not (ctl_pred w)
+{-# INLINE text #-}
 
 -- | Utilities
 appcon :: [a] -> [[a]] -> [a]
 appcon = (. join) . (++)
 word8l w = (:[]) <$> word8 w
 toRepr = C.unpack . W.pack
+
+asList :: Parser a -> Parser [a]
+asList p = (:[]) <$> p
