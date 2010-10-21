@@ -110,9 +110,6 @@ request = do
              , rqBody    = W.empty -- W.pack body
              }
 
--- data GenericMessage = GenericMessage
---     { 
-
 -- data HttpMessage = Request | Response
 data Header = GeneralHeader | RequestHeader | EntityHeader
 
