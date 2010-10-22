@@ -93,7 +93,6 @@ header = ret <$> headerName  <* (word8 58 <* lwss)
              <*> headerValue <* lwss
     where ret n v = (W.pack n, W.pack v)
 
-
 entityBody = many octet
 messageBody = entityBody
 

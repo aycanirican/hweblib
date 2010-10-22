@@ -11,7 +11,7 @@ import Network.Http.Parser.Rfc2234
 import Network.Http.Parser.RfcCommon
 
 tests = TestList $ fmap TestCase lst
-lst = [test_version, test_quotedPrintable]
+lst = [test_version, test_quotedPrintable, test_content]
 
 test_version = ae "mime-version" (Just (1,0)) (aP version "Mime-Version: 1.0 ")
 
@@ -22,3 +22,8 @@ qpStringRes = C.pack "If you believe that truth=beauty, then surely mathematics 
 test_quotedPrintable = ae "quotedPrintable"
                        (Just qpStringRes)
                        (aP quotedPrintable qpString)
+
+mimecontent1 = Content
+test_content = ae "content" 
+               (Just $ Content ())
+               (aP content "Content-type: text/plain; charset=us-ascii (Plain text)")

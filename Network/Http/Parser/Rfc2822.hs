@@ -97,7 +97,7 @@ qtext :: Parser Word8
 qtext = satisfy qtext_pred
 {-# INLINE qtext #-}
 
-qcontent = option [] ((:[]) <$>qtext) <|> quotedPair
+qcontent = option [] (asList qtext) <|> quotedPair
 quoted_string = do
   option [] cfws
   dquote
@@ -119,7 +119,7 @@ utext = no_ws_ctl <|> satisfy (\w -> w>=33 && w<=126)
 
 -- * 3.4. Address Specification
 address :: Parser [NameAddress]
-address = try ((:[]) <$> mailbox)
+address = try (asList mailbox)
           <|> group
 
 mailbox :: Parser NameAddress
@@ -200,13 +200,13 @@ id_right = dot_atom_text <|> no_fold_literal
 
 no_fold_quote = do
   l <- dquote
-  m <- concat <$> many (option [] ((:[]) <$> qtext) <|> quotedPair)
+  m <- concat <$> many (option [] (asList qtext) <|> quotedPair)
   r <- dquote
   return $ [l] ++ m ++ [r]
 
 no_fold_literal = do
   l <- word8 91 -- '['
-  m <- concat <$> many (option [] ((:[]) <$> dtext) <|> quotedPair)
+  m <- concat <$> many (option [] (asList dtext) <|> quotedPair)
   r <- word8 93 -- ']'
   return $ [l] ++ m ++ [r]
 
@@ -216,4 +216,3 @@ data NameAddress
       { naName :: Maybe ByteString
       , naAddr :: ByteString
       } deriving (Eq, Show)
-                         

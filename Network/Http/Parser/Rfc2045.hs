@@ -22,16 +22,33 @@ import Data.Word (Word8)
 import Prelude hiding (take, takeWhile)
 import Network.Http.Parser.RfcCommon
 import Network.Http.Parser.Rfc2234
-import Network.Http.Parser.Rfc2822 (msg_id)
+import Network.Http.Parser.Rfc2822 (msg_id, comment)
 import qualified Data.Map as M
 import Prelude hiding (id)
 
+-- * 3. MIME Header Fields
+
+--mimePartHeaders = entityHeaders
+
+--mimeMessageHeaders = entityHeaders
+
+entityHeaders :: Parser [EntityHeader]
+entityHeaders = many1 entityHeader
+
+entityHeader :: Parser EntityHeader
+entityHeader = contentId <* crlf
+               <|> content <* crlf
+               <|> encoding <* crlf
+               <|> description <* crlf
+               <|> version <* crlf
+               <|> mimeExtensionField <* crlf
+
 -- * 4.  MIME-Version Header Field
 
-version :: Parser (Int,Int)
-version = (,)
-          <$> (AC.stringCI "mime-version" *> colonsp *> AC.decimal) -- ':'
+version :: Parser EntityHeader
+version = ret <$> (AC.stringCI "mime-version" *> colonsp *> AC.decimal) -- ':'
           <*> (word8 46 *> AC.decimal) -- '.'
+    where ret a b = VersionHeader . Version $ (a,b)
 
 -- * 5. Content-Type Header Field
 
@@ -69,8 +86,8 @@ xToken = AC.stringCI "x-" *> (W.pack <$> many1 (satisfy xToken_pred))
 value :: Parser [Word8]
 value = token <|> quotedString
 
-mtype :: Parser (Either Discrete Composite)
-mtype =  eitherP discreteType compositeType
+mtype :: Parser MimeType
+mtype =  discreteType <|> compositeType
 
 -- TODO: subtype = extensionToken <|> ianaToken
 subtype :: Parser ByteString
@@ -80,29 +97,29 @@ subtype = W.pack <$> token
 extensionToken :: Parser ByteString
 extensionToken = xToken
 
-discreteType :: Parser Discrete
+discreteType :: Parser MimeType
 discreteType = (Text <$ AC.stringCI "text")
                <|> (Image <$ AC.stringCI "image")
                <|> (Audio <$ AC.stringCI "audio")
                <|> (Video <$ AC.stringCI "video")
                <|> (Application <$ AC.stringCI "application")
-               <|> DiscreteExtension <$> extensionToken
+               <|> MTExtension <$> extensionToken
 
-compositeType :: Parser Composite
+compositeType :: Parser MimeType
 compositeType = (Message <$ AC.stringCI "message")
                 <|> (MultiPart <$ AC.stringCI "multipart")
-                <|> CompositeExtension <$> extensionToken
+                <|> MTExtension <$> extensionToken
 
-content :: Parser MimeContent
+content :: Parser EntityHeader
 content = res <$> (AC.stringCI "content-type" *> colonsp *> mtype)
           <*> (word8 47 *> subtype)
           <*> many (semicolonsp *> parameter)
-    where res a b ps = MimeContent a b (M.fromList ps)
+    where res a b ps = ContentHeader $ Content a b (M.fromList ps)
 
 -- * 6. Content-Transfer-Encoding Header Type
 
-encoding :: Parser ByteString
-encoding = AC.stringCI "content-transfer-encoding" *> colonsp *> mechanism
+encoding :: Parser EntityHeader
+encoding = (EncodingHeader . Encoding) <$> (AC.stringCI "content-transfer-encoding" *> colonsp *> mechanism)
 
 mechanism :: Parser ByteString
 mechanism = AC.stringCI "7bit" 
@@ -156,16 +173,23 @@ quotedPrintable = do
   a <- appcon <$> qpLine <*> many (crlf *> qpLine)
   return $ W.pack a
 
+
 -- * 7.  Content-ID Header Field
-contentId = W.pack <$> (AC.stringCI "content-id" *> colonsp *> msg_id)
+contentId :: Parser EntityHeader
+contentId = IdHeader . Id . W.pack <$> (AC.stringCI "content-id" *> colonsp *> msg_id)
 
 -- * 8.  Content-Description Header Field
 -- TODO: support 2047 encoding
-description = AC.stringCI "content-description" *> colonsp *> many text
+description :: Parser EntityHeader
+description = (DescriptionHeader . Description . W.pack) <$> (AC.stringCI "content-description" *> colonsp *> many text)
 
 -- * 9. Additional MIME Header Fields
 -- TODO: support 822 header fields
-mimeExtensionField = AC.stringCI "content-" *> token *> colonsp *> many text
+mimeExtensionField :: Parser EntityHeader
+mimeExtensionField = do
+  k <- AC.stringCI "content-" *> token
+  v <- colonsp *> many text
+  return . ExtensionHeader . Extension $ (W.pack k, W.pack v)
 
 
 -- entityHeaders = do
@@ -186,31 +210,35 @@ semicolonsp = word8 59 *> lws *> pure ()
 
 -- * ADTs
 
-data HeaderField 
-    = HeaderField 
-      { hName :: ByteString
-      , hValue :: ByteString
-      , hParams :: M.Map ByteString ByteString
-      }
+data EntityHeader
+    = ContentHeader Content
+    | EncodingHeader Encoding
+    | IdHeader Id
+    | DescriptionHeader Description
+    | ExtensionHeader Extension
+    | VersionHeader Version
 
-data Discrete
+data Encoding = Encoding ByteString
+data Id = Id ByteString
+data Description = Description ByteString
+data Extension = Extension (ByteString, ByteString)
+data Version = Version (Int,Int)
+data Content
+    = Content 
+      { cType :: MimeType
+      , cSubtype :: ByteString
+      , cParams :: M.Map ByteString ByteString
+      } deriving (Eq, Show)
+
+data MimeType
     = Text 
     | Image 
     | Audio
     | Video
     | Application
-    | DiscreteExtension ByteString 
-      deriving (Eq, Show)
-
-data Composite
-    = Message
+    | Message
     | MultiPart
-    | CompositeExtension ByteString 
+    | MTExtension ByteString 
       deriving (Eq, Show)
 
-data MimeContent
-    = MimeContent 
-      { mcType :: Either Discrete Composite
-      , mcSubtype :: ByteString
-      , mcParams :: M.Map ByteString ByteString
-      }
+
