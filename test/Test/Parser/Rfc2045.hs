@@ -27,3 +27,6 @@ mimecontent1 = Content
 test_content = ae "content" 
                (Just $ Content ())
                (aP content "Content-type: text/plain; charset=us-ascii (Plain text)")
+
+-- *Network.Http.Parser.Rfc2045> parse content (C.pack "Content-Type: multipart/mixed; boundary=\"frontier\"\n")
+-- Done "\n" Header {hType = ContentH, hValue = "multipart/mixed", hParams = fromList [("boundary","frontier")]}

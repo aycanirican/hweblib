@@ -32,10 +32,10 @@ import Prelude hiding (id)
 
 --mimeMessageHeaders = entityHeaders
 
-entityHeaders :: Parser [EntityHeader]
+entityHeaders :: Parser [Header]
 entityHeaders = many1 entityHeader
 
-entityHeader :: Parser EntityHeader
+entityHeader :: Parser Header
 entityHeader = contentId <* crlf
                <|> content <* crlf
                <|> encoding <* crlf
@@ -45,10 +45,10 @@ entityHeader = contentId <* crlf
 
 -- * 4.  MIME-Version Header Field
 
-version :: Parser EntityHeader
+version :: Parser Header
 version = ret <$> (AC.stringCI "mime-version" *> colonsp *> AC.decimal) -- ':'
           <*> (word8 46 *> AC.decimal) -- '.'
-    where ret a b = VersionHeader . Version $ (a,b)
+    where ret a b = Header VersionH (W.pack [a,44,b]) M.empty
 
 -- * 5. Content-Type Header Field
 
@@ -86,8 +86,17 @@ xToken = AC.stringCI "x-" *> (W.pack <$> many1 (satisfy xToken_pred))
 value :: Parser [Word8]
 value = token <|> quotedString
 
-mtype :: Parser MimeType
-mtype =  discreteType <|> compositeType
+-- discrete and composite types are a little bit different from BNF
+-- definitions in order to keep code flow clean.
+mtype :: Parser ByteString
+mtype = AC.stringCI "multipart"
+        <|> AC.stringCI "text"
+        <|> AC.stringCI "image"
+        <|> AC.stringCI "audio"
+        <|> AC.stringCI "video"
+        <|> AC.stringCI "application"
+        <|> AC.stringCI "message"
+        <|> extensionToken
 
 -- TODO: subtype = extensionToken <|> ianaToken
 subtype :: Parser ByteString
@@ -97,29 +106,18 @@ subtype = W.pack <$> token
 extensionToken :: Parser ByteString
 extensionToken = xToken
 
-discreteType :: Parser MimeType
-discreteType = (Text <$ AC.stringCI "text")
-               <|> (Image <$ AC.stringCI "image")
-               <|> (Audio <$ AC.stringCI "audio")
-               <|> (Video <$ AC.stringCI "video")
-               <|> (Application <$ AC.stringCI "application")
-               <|> MTExtension <$> extensionToken
-
-compositeType :: Parser MimeType
-compositeType = (Message <$ AC.stringCI "message")
-                <|> (MultiPart <$ AC.stringCI "multipart")
-                <|> MTExtension <$> extensionToken
-
-content :: Parser EntityHeader
+-- * 5.  Content-Type Header Field
+content :: Parser Header
 content = res <$> (AC.stringCI "content-type" *> colonsp *> mtype)
           <*> (word8 47 *> subtype)
           <*> many (semicolonsp *> parameter)
-    where res a b ps = ContentHeader $ Content a b (M.fromList ps)
+    where res a b ps = Header ContentH (C.concat [a, "/", b]) (M.fromList ps)
 
 -- * 6. Content-Transfer-Encoding Header Type
 
-encoding :: Parser EntityHeader
-encoding = (EncodingHeader . Encoding) <$> (AC.stringCI "content-transfer-encoding" *> colonsp *> mechanism)
+encoding :: Parser Header
+encoding = ret <$> (AC.stringCI "content-transfer-encoding" *> colonsp *> mechanism)
+    where ret m = Header EncodingH m M.empty
 
 mechanism :: Parser ByteString
 mechanism = AC.stringCI "7bit" 
@@ -175,30 +173,23 @@ quotedPrintable = do
 
 
 -- * 7.  Content-ID Header Field
-contentId :: Parser EntityHeader
-contentId = IdHeader . Id . W.pack <$> (AC.stringCI "content-id" *> colonsp *> msg_id)
+contentId :: Parser Header
+contentId = ret <$> (AC.stringCI "content-id" *> colonsp *> msg_id)
+    where ret i = Header IdH (W.pack i) M.empty
 
 -- * 8.  Content-Description Header Field
 -- TODO: support 2047 encoding
-description :: Parser EntityHeader
-description = (DescriptionHeader . Description . W.pack) <$> (AC.stringCI "content-description" *> colonsp *> many text)
+description :: Parser Header
+description = ret <$> (AC.stringCI "content-description" *> colonsp *> many text)
+    where ret d = Header DescriptionH (W.pack d) M.empty
 
 -- * 9. Additional MIME Header Fields
 -- TODO: support 822 header fields
-mimeExtensionField :: Parser EntityHeader
+mimeExtensionField :: Parser Header
 mimeExtensionField = do
   k <- AC.stringCI "content-" *> token
   v <- colonsp *> many text
-  return . ExtensionHeader . Extension $ (W.pack k, W.pack v)
-
-
--- entityHeaders = do
---   c <- try (content <* crlf)
---   e <- try (encoding <* crlf)
---   i <- try (id <* crlf)
---   d <- try (description <* crlf)
---   rest <- many (mimeExtensionField <* crlf)
---   return [c,e,i,d] ++ rest
+  return $ Header (ExtensionH $ W.pack k)  (W.pack v) M.empty
 
 
 -- * Utilities
@@ -208,37 +199,112 @@ colonsp = word8 58 *> lws *> pure ()
 semicolonsp :: Parser ()
 semicolonsp = word8 59 *> lws *> pure ()
 
--- * ADTs
+-- | * ADTs
 
-data EntityHeader
-    = ContentHeader Content
-    | EncodingHeader Encoding
-    | IdHeader Id
-    | DescriptionHeader Description
-    | ExtensionHeader Extension
-    | VersionHeader Version
+data HeaderType
+    = ContentH
+    | EncodingH
+    | IdH
+    | DescriptionH
+    | VersionH
+    | ExtensionH ByteString
+      deriving (Eq,Show)
 
-data Encoding = Encoding ByteString
-data Id = Id ByteString
-data Description = Description ByteString
-data Extension = Extension (ByteString, ByteString)
-data Version = Version (Int,Int)
-data Content
-    = Content 
-      { cType :: MimeType
-      , cSubtype :: ByteString
-      , cParams :: M.Map ByteString ByteString
+data Header
+    = Header 
+      { hType :: HeaderType
+      , hValue :: ByteString
+      , hParams :: M.Map ByteString ByteString
       } deriving (Eq, Show)
 
+--------------------------------------------------------------------
+-- Parts of the code
+-- Copyright : (c) 2006-2009, Galois, Inc. 
+-- License   : BSD3
+
+-- | recursive at MimeContent, holding mime values
+data MimeValue 
+    = MimeValue
+      { mvType :: Type
+      , mvDisp :: Maybe Disposition
+      , mvContent :: MimeContent
+      , mvHeaders :: M.Map ByteString ByteString
+      , mvIncType :: Bool
+      } deriving (Eq, Show)
+
+nullMimeValue :: MimeValue
+nullMimeValue 
+    = MimeValue 
+      { mvType = nullType
+      , mvDisp = Nothing 
+      , mvContent = Multi []
+      , mvHeaders = M.empty
+      , mvIncType = True
+      }
+
+data Type
+    = Type
+      { mimeType :: MimeType
+      , mimeParams :: M.Map ByteString ByteString
+      } deriving (Eq, Show)
+
+nullType :: Type
+nullType = Type (Text "plain") (M.empty)
+
+type SubType = ByteString
+type TextType = ByteString
+
 data MimeType
-    = Text 
-    | Image 
-    | Audio
-    | Video
-    | Application
-    | Message
-    | MultiPart
-    | MTExtension ByteString 
+    = Text TextType
+    | Image SubType
+    | Audio SubType
+    | Video SubType
+    | Application SubType
+    | Message SubType
+    | MultiPart Multipart
+    | Other ByteString SubType
       deriving (Eq, Show)
 
+data Multipart
+    = Alternative
+    | Byteranges
+    | Digest
+    | Encrypted
+    | FormData
+    | Mixed
+    | Parallel
+    | Related
+    | Signed
+    | Extension ByteString
+    | OtherMultiPart ByteString
+      deriving (Eq, Show)
 
+type Content = ByteString
+data MimeContent
+    = Single Content
+    | Multi [MimeValue]
+      deriving (Eq, Show)
+
+data Disposition
+    = Disposition
+      { dispType :: DispType
+      , dispParams :: [DispParam]
+      } deriving (Eq, Show)
+
+data DispType
+    = DispInline
+    | DispAttachment
+    | DispFormData
+    | DispOther String
+      deriving (Eq, Show)
+
+data DispParam
+    = Name String
+    | Filename String
+    | CreationDate String
+    | ModDate String
+    | ReadDate String
+    | Size String
+    | OtherParam String String
+      deriving (Eq, Show)
+--------------------------------------------------------------------
