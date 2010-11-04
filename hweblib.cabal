@@ -1,10 +1,10 @@
 Name:                hweblib
-Version:             0.1
+Version:             0.2
 Synopsis:            Haskell Web Library
 Description:
   The library includes attoparsec based incremental parsers for
-  rfc2616 (http) and rfc3986 (uri). rfcs 2045, 2046, 2109, 2388, 2617
-  are planned.
+  rfc2616 (http) and rfc3986 (uri), rfc2045-46 (mime). The package
+  name will subject to change due to broad range of rfc coverage.
 
 Homepage:            http://github.com/aycanirican/hweblib
 License:             BSD3

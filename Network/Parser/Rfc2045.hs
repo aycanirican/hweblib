@@ -80,7 +80,7 @@ token = many1 $ satisfy token_pred
 attribute :: Parser [Word8]
 attribute = token
 
-parameter :: Parser (ByteString,ByteString)
+parameter :: Parser (ByteString, ByteString)
 parameter = res <$> (attribute <* word8 61) <*> value
     where res a v = (W.pack a, W.pack v)
 

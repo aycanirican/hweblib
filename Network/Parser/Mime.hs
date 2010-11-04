@@ -46,12 +46,13 @@ string2mimetype s =
                  (a, T.drop 1 b)
 
 -- Parse headers and map them to a MimeValue
-parseMime :: Parser MimeValue
-parseMime = do
+parseMimeHeaders :: Parser MimeValue
+parseMimeHeaders = do
   eh <- entityHeaders
   let mv = L.foldl f nullMimeValue eh
   return mv
   where 
+    bs2t = M.fromList . Prelude.map (\(a,b) -> (TE.decodeASCII a, TE.decodeASCII b)) . M.toList
     hVal = TE.decodeASCII . hValue
     f z x = 
         case hType x of
@@ -60,9 +61,7 @@ parseMime = do
           VersionH -> z { mvHeaders = M.insert VersionH (hVal x) (mvHeaders z) }
           EncodingH -> z { mvHeaders = M.insert EncodingH (hVal x) (mvHeaders z) }
           ExtensionH e -> z { mvHeaders = M.insert (ExtensionH e) (hVal x) (mvHeaders z) }
-          _ -> z
-
-
+          ContentH -> z { mvType = Type ((string2mimetype . hValue) x) (bs2t $ hParams x) }
 
 -- | * Data Types
 -----------------
