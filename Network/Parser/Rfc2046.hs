@@ -7,7 +7,7 @@
 --
 -- Multipurpose Internet Mail Extensions (MIME) Part Two: Media Types
 
-module Network.Http.Parser.Rfc2046 where
+module Network.Parser.Rfc2046 where
 
 import Control.Monad (join)
 import Control.Applicative as A hiding (many)
@@ -19,9 +19,9 @@ import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8)
 import Prelude hiding (take, takeWhile)
-import Network.Http.Parser.RfcCommon
-import Network.Http.Parser.Rfc2234
-import Network.Http.Parser.Rfc2045
+import Network.Parser.RfcCommon
+import Network.Parser.Rfc2234
+import Network.Parser.Rfc2045
 import qualified Data.Map as M
 import Prelude hiding (id)
 

@@ -5,10 +5,10 @@
 
 -- http://www.ietf.org/rfc/rfc2045.txt
 --
--- Multipurpose Internet Mail Extensions (MIME) Part One: Format of
--- Internet Message Bodies
+-- Multipurpose Internet Mail Extensions (MIME) Part One: 
+--   Format of Internet Message Bodies
 
-module Network.Http.Parser.Rfc2045 where
+module Network.Parser.Rfc2045 where
 
 import Control.Monad (join)
 import Control.Applicative as A hiding (many)
@@ -20,27 +20,33 @@ import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8)
 import Prelude hiding (take, takeWhile)
-import Network.Http.Parser.RfcCommon
-import Network.Http.Parser.Rfc2234
-import Network.Http.Parser.Rfc2822 (msg_id, comment)
+import Network.Parser.RfcCommon
+import Network.Parser.Rfc2234
+import Network.Parser.Rfc2822 (msg_id, comment)
 import qualified Data.Map as M
-import Prelude hiding (id)
+
+-- TODO: implement fields of rfc 822
+
+-- TODO: we don't support comments on header values "MIME-Version:
+-- 1.(produced by MetaSend Vx.x)0" which we should parse and ignore.
+
 
 -- * 3. MIME Header Fields
 
---mimePartHeaders = entityHeaders
-
---mimeMessageHeaders = entityHeaders
+--mimePartHeaders = ret <$> entityHeaders <*> option [] fields
+--  where ret eh f = ...
+--mimeMessageHeaders = ret <$> entityHeaders <*> fields <*> (version <* crlf)
+--  where ret eh f v = ...
 
 entityHeaders :: Parser [Header]
 entityHeaders = many1 entityHeader
 
 entityHeader :: Parser Header
-entityHeader = contentId <* crlf
+entityHeader = version <* crlf
                <|> content <* crlf
                <|> encoding <* crlf
                <|> description <* crlf
-               <|> version <* crlf
+               <|> contentId <* crlf
                <|> mimeExtensionField <* crlf
 
 -- * 4.  MIME-Version Header Field
@@ -48,7 +54,7 @@ entityHeader = contentId <* crlf
 version :: Parser Header
 version = ret <$> (AC.stringCI "mime-version" *> colonsp *> AC.decimal) -- ':'
           <*> (word8 46 *> AC.decimal) -- '.'
-    where ret a b = Header VersionH (W.pack [a,44,b]) M.empty
+    where ret a b = Header VersionH (W.pack [a+48,46,b+48]) M.empty
 
 -- * 5. Content-Type Header Field
 
@@ -106,7 +112,6 @@ subtype = W.pack <$> token
 extensionToken :: Parser ByteString
 extensionToken = xToken
 
--- * 5.  Content-Type Header Field
 content :: Parser Header
 content = res <$> (AC.stringCI "content-type" *> colonsp *> mtype)
           <*> (word8 47 *> subtype)
@@ -163,14 +168,12 @@ qpLine :: Parser [Word8]
 qpLine = do
   a <- many $ (++) <$> qpSegment <*> (transportPadding <* crlf)
   b <- (++) <$> qpPart <*> transportPadding
-  
   return $ join a ++ b
 
 quotedPrintable :: Parser ByteString
 quotedPrintable = do 
   a <- appcon <$> qpLine <*> many (crlf *> qpLine)
   return $ W.pack a
-
 
 -- * 7.  Content-ID Header Field
 contentId :: Parser Header
@@ -191,7 +194,6 @@ mimeExtensionField = do
   v <- colonsp *> many text
   return $ Header (ExtensionH $ W.pack k)  (W.pack v) M.empty
 
-
 -- * Utilities
 colonsp :: Parser ()
 colonsp = word8 58 *> lws *> pure ()
@@ -199,8 +201,8 @@ colonsp = word8 58 *> lws *> pure ()
 semicolonsp :: Parser ()
 semicolonsp = word8 59 *> lws *> pure ()
 
--- | * ADTs
-
+-- | * Temporary ADTs
+---------------------
 data HeaderType
     = ContentH
     | EncodingH
@@ -208,7 +210,7 @@ data HeaderType
     | DescriptionH
     | VersionH
     | ExtensionH ByteString
-      deriving (Eq,Show)
+      deriving (Eq,Show,Ord)
 
 data Header
     = Header 
@@ -217,94 +219,3 @@ data Header
       , hParams :: M.Map ByteString ByteString
       } deriving (Eq, Show)
 
---------------------------------------------------------------------
--- Parts of the code
--- Copyright : (c) 2006-2009, Galois, Inc. 
--- License   : BSD3
-
--- | recursive at MimeContent, holding mime values
-data MimeValue 
-    = MimeValue
-      { mvType :: Type
-      , mvDisp :: Maybe Disposition
-      , mvContent :: MimeContent
-      , mvHeaders :: M.Map ByteString ByteString
-      , mvIncType :: Bool
-      } deriving (Eq, Show)
-
-nullMimeValue :: MimeValue
-nullMimeValue 
-    = MimeValue 
-      { mvType = nullType
-      , mvDisp = Nothing 
-      , mvContent = Multi []
-      , mvHeaders = M.empty
-      , mvIncType = True
-      }
-
-data Type
-    = Type
-      { mimeType :: MimeType
-      , mimeParams :: M.Map ByteString ByteString
-      } deriving (Eq, Show)
-
-nullType :: Type
-nullType = Type (Text "plain") (M.empty)
-
-type SubType = ByteString
-type TextType = ByteString
-
-data MimeType
-    = Text TextType
-    | Image SubType
-    | Audio SubType
-    | Video SubType
-    | Application SubType
-    | Message SubType
-    | MultiPart Multipart
-    | Other ByteString SubType
-      deriving (Eq, Show)
-
-data Multipart
-    = Alternative
-    | Byteranges
-    | Digest
-    | Encrypted
-    | FormData
-    | Mixed
-    | Parallel
-    | Related
-    | Signed
-    | Extension ByteString
-    | OtherMultiPart ByteString
-      deriving (Eq, Show)
-
-type Content = ByteString
-data MimeContent
-    = Single Content
-    | Multi [MimeValue]
-      deriving (Eq, Show)
-
-data Disposition
-    = Disposition
-      { dispType :: DispType
-      , dispParams :: [DispParam]
-      } deriving (Eq, Show)
-
-data DispType
-    = DispInline
-    | DispAttachment
-    | DispFormData
-    | DispOther String
-      deriving (Eq, Show)
-
-data DispParam
-    = Name String
-    | Filename String
-    | CreationDate String
-    | ModDate String
-    | ReadDate String
-    | Size String
-    | OtherParam String String
-      deriving (Eq, Show)
---------------------------------------------------------------------

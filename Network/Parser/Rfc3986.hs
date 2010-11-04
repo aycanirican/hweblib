@@ -12,7 +12,7 @@
   TODO: implement ipv6 and ipvfuture
 -}
 
-module Network.Http.Parser.Rfc3986 where
+module Network.Parser.Rfc3986 where
 
 import Control.Applicative hiding (many)
 import Data.Attoparsec
@@ -28,8 +28,8 @@ import Data.List (concat)
 import Prelude hiding (take, takeWhile)
 import Data.Typeable (Typeable)
 import Data.Data (Data)
-import qualified Network.Http.Parser.RfcCommon as RC
-import Network.Http.Parser.Rfc2234
+import qualified Network.Parser.RfcCommon as RC
+import Network.Parser.Rfc2234
 
 data URI = URI
     { uriScheme     :: String

@@ -1,8 +1,8 @@
 module Main where
 
 import Criterion.Main
-import Network.Http.Parser.Rfc3986 (uri)
-import Network.Http.Parser.Rfc2616 (request)
+import Network.Parser.Rfc3986 (uri)
+import Network.Parser.Rfc2616 (request)
 import Data.Attoparsec
 import Data.ByteString.Char8 as C
 import Test.Parser.Rfc2616 (parseGetData)

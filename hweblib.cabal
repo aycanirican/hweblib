@@ -18,13 +18,15 @@ Cabal-version:       >=1.6
 Library
   -- Modules exported by the library.
   Exposed-modules: 
-    Network.Http.Parser.RfcCommon
-    , Network.Http.Parser.Rfc2234
-    , Network.Http.Parser.Rfc2822
-    , Network.Http.Parser.Rfc2045
-    , Network.Http.Parser.Rfc3986
-    , Network.Http.Parser.Rfc2616 
-  
+    Network.Parser.RfcCommon
+    , Network.Parser.Rfc2234
+    , Network.Parser.Rfc2822
+    , Network.Parser.Rfc2045
+    , Network.Parser.Rfc2046
+    , Network.Parser.Rfc3986
+    , Network.Parser.Rfc2616 
+    , Network.Parser.Mime
+
   -- Packages needed in order to build this package.
   Build-depends:
     base >= 4 && < 5
@@ -32,6 +34,7 @@ Library
     , bytestring
     , monads-fd
     , transformers
+    , text
     , attoparsec
 
 source-repository head

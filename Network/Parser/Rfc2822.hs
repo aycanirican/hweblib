@@ -5,7 +5,7 @@
 
 -- http://www.ietf.org/rfc/rfc2822.txt
 
-module Network.Http.Parser.Rfc2822 where
+module Network.Parser.Rfc2822 where
 
 import Control.Monad (join)
 import Control.Applicative as A hiding (many)
@@ -17,8 +17,8 @@ import Data.ByteString.Char8 as C hiding (concat,intersperse,group)
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8)
 import Prelude hiding (take, takeWhile)
-import Network.Http.Parser.RfcCommon hiding (ctext)
-import Network.Http.Parser.Rfc2234
+import Network.Parser.RfcCommon hiding (ctext)
+import Network.Parser.Rfc2234
 import qualified Data.Map as M
 import Prelude hiding (id)
 import Data.List hiding (group)

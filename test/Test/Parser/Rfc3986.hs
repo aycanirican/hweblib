@@ -5,7 +5,7 @@ import Data.Attoparsec
 import qualified Data.ByteString.Char8 as C
 import Test.Parser.Parser
 import Test.HUnit
-import Network.Http.Parser.Rfc3986
+import Network.Parser.Rfc3986
 
 tests = TestList $ fmap TestCase lst
 

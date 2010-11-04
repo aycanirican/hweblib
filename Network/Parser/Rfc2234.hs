@@ -3,7 +3,7 @@
   , PackageImports
   #-}
 
-module Network.Http.Parser.Rfc2234 where
+module Network.Parser.Rfc2234 where
 
 import Control.Applicative hiding (many)
 import Data.Attoparsec

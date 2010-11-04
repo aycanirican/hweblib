@@ -6,9 +6,9 @@ import Data.ByteString as W
 import qualified Data.ByteString.Char8 as C
 import Test.Parser.Parser
 import Test.HUnit
-import Network.Http.Parser.RfcCommon
-import Network.Http.Parser.Rfc2234
-import Network.Http.Parser.Rfc2616
+import Network.Parser.RfcCommon
+import Network.Parser.Rfc2234
+import Network.Parser.Rfc2616
 
 -- Data
 parseGetData = C.concat 

@@ -6,12 +6,12 @@ import Data.ByteString as W
 import qualified Data.ByteString.Char8 as C
 import Test.Parser.Parser
 import Test.HUnit
-import Network.Http.Parser.Rfc2045
-import Network.Http.Parser.Rfc2234
-import Network.Http.Parser.RfcCommon
+import Network.Parser.Rfc2045
+import Network.Parser.Rfc2234
+import Network.Parser.RfcCommon
 
 tests = TestList $ fmap TestCase lst
-lst = [test_version, test_quotedPrintable, test_content]
+lst = [test_version, test_quotedPrintable]
 
 test_version = ae "mime-version" (Just (1,0)) (aP version "Mime-Version: 1.0 ")
 
@@ -23,10 +23,10 @@ test_quotedPrintable = ae "quotedPrintable"
                        (Just qpStringRes)
                        (aP quotedPrintable qpString)
 
-mimecontent1 = Content
-test_content = ae "content" 
-               (Just $ Content ())
-               (aP content "Content-type: text/plain; charset=us-ascii (Plain text)")
+--mimecontent1 = Content
+--test_content = ae "content" 
+--               (Just $ Content ())
+--               (aP content "Content-type: text/plain; charset=us-ascii (Plain text)")
 
 -- *Network.Http.Parser.Rfc2045> parse content (C.pack "Content-Type: multipart/mixed; boundary=\"frontier\"\n")
 -- Done "\n" Header {hType = ContentH, hValue = "multipart/mixed", hParams = fromList [("boundary","frontier")]}

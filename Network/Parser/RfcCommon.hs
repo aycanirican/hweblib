@@ -5,7 +5,7 @@
   , TupleSections
   #-}
 
-module Network.Http.Parser.RfcCommon where
+module Network.Parser.RfcCommon where
 
 import Control.Applicative hiding (many)
 import Data.Attoparsec as AW
@@ -22,7 +22,7 @@ import Control.Monad (join)
 import Prelude hiding (take, takeWhile)
 import Data.Typeable (Typeable)
 import Data.Data (Data)
-import Network.Http.Parser.Rfc2234
+import Network.Parser.Rfc2234
 
 ----
 -- * Common Parsers

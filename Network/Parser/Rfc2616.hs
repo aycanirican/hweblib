@@ -3,7 +3,7 @@
   , PackageImports
   #-}
 
-module Network.Http.Parser.Rfc2616 where
+module Network.Parser.Rfc2616 where
 
 import Control.Applicative hiding (many)
 import Data.Attoparsec
@@ -14,9 +14,9 @@ import Data.ByteString.Char8 as C hiding (concat)
 import Data.ByteString.Internal (c2w)
 import Data.Word (Word8())
 import Prelude hiding (take, takeWhile)
-import qualified Network.Http.Parser.Rfc3986 as R3986
-import Network.Http.Parser.RfcCommon
-import Network.Http.Parser.Rfc2234
+import qualified Network.Parser.Rfc3986 as R3986
+import Network.Parser.RfcCommon
+import Network.Parser.Rfc2234
 import Data.List
 -- | Basic Parser Constructs for RFC 2616
 
