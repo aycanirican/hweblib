@@ -25,9 +25,11 @@ import Data.List hiding (group)
 
 
 
--- * 3.2.1. Primitive Tokens
+-- | * 3.2.1. Primitive Tokens
 no_ws_ctl_pred w = w == 32 || ctl_pred w
 no_ws_ctl = satisfy no_ws_ctl_pred
+
+-- | Parse a text element and return corresponding Word8
 text = satisfy $ \w ->
        (w >= 1 && w<=9)
        || w == 11
@@ -38,19 +40,25 @@ text = satisfy $ \w ->
 
 specialsSet ::[Word8]
 specialsSet = [40,41,60,62,91,93,58,59,64,92,44,46,34]
+
 specials_pred :: Word8 -> Bool
 specials_pred w = F.memberWord8 w (F.fromList specialsSet)
+
+-- | Parse a special
 specials :: Parser Word8
 specials = satisfy specials_pred
 
--- * 3.2.3. Folding white space and comments
+-- | * 3.2.3. Folding white space and comments
 
+-- | Parse Whitespaces
 wsps :: Parser [Word8]
 wsps = many1 wsp
 
+-- | Parse Folding Whitespace
 fws :: Parser [Word8]
 fws = return [32] <$> many1 (choice [wsps, (crlf *> wsps)])
 
+-- | Parse ctext
 ctext :: Parser Word8
 ctext = crlf <|> no_ws_ctl <|> satisfy rest
     where 
@@ -58,6 +66,7 @@ ctext = crlf <|> no_ws_ctl <|> satisfy rest
                || (w >= 42 && w <= 91)
                || (w >= 93 && w <= 126)
 
+-- | Parse a comment 
 comment :: Parser [Word8]
 comment = do
   word8 40
@@ -73,7 +82,7 @@ comment = do
 
 cfws = concat <$> many1 (choice [fws, comment])
 
--- * 3.2.4. Atom
+-- | * 3.2.4. Atom
 atext_pred w = char_pred w && not (ctl_pred w || sp_pred w || specials_pred w)
 atext = satisfy atext_pred
 
@@ -86,7 +95,7 @@ dot_atom_text = concat . intersperse [46] <$> sepBy (many1 atext) (word8 46)
 dot_atom :: Parser [Word8]
 dot_atom = option [] cfws *> dot_atom_text <* option [] cfws
 
--- * 3.2.5. Quoted strings
+-- | * 3.2.5. Quoted strings
 qtext_pred :: Word8 -> Bool
 qtext_pred w = no_ws_ctl_pred w 
                || w == 33 
@@ -110,14 +119,14 @@ quoted_string = do
   option [] cfws
   return $ [34] ++ r1 ++ r2 ++ [34]
 
--- * 3.2.6. Miscellaneous tokens
+-- | * 3.2.6. Miscellaneous tokens
 word = atom <|> quotedString
 
 phrase :: Parser [[Word8]]
 phrase = many1 word
 utext = no_ws_ctl <|> satisfy (\w -> w>=33 && w<=126)
 
--- * 3.4. Address Specification
+-- | * 3.4. Address Specification
 address :: Parser [NameAddress]
 address = try (asList mailbox)
           <|> group
@@ -179,7 +188,7 @@ dcontent = try (do r <- dtext
 dtext_pred w = no_ws_ctl_pred w || (w>=33 && w<=90) || (w>=94 && w<= 126)
 dtext = satisfy dtext_pred
 
--- * 3.6.4. Identification fields
+-- | * 3.6.4. Identification fields
 
 message_id = AC.stringCI "message-id:" *> msg_id
 

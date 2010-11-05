@@ -19,9 +19,10 @@ import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8)
 import Prelude hiding (take, takeWhile)
-import Network.Parser.RfcCommon
+import Network.Parser.RfcCommon hiding (text)
 import Network.Parser.Rfc2234
 import Network.Parser.Rfc2045
+import Network.Parser.Rfc2822
 import qualified Data.Map as M
 import Prelude hiding (id)
 
@@ -39,4 +40,17 @@ bchars = bcharsnospace <|> satisfy (== 32)
 
 -- TODO: 0*69<bchars> bcharsnospace
 boundary = many1 bchars
-dash-boundary = word8 45 *> word8 45 *> boundary
+dashBoundary = word8 45 *> word8 45 *> boundary
+
+encapsulation = ret <$> delimiter <* transportPadding
+                <*> crlf *> bodyPart
+    where ret d b = (d,b)
+
+delimiter = crlf *> dashBoundary
+
+-- discardText = many line *> text
+--   where line = option 32 (many text *> crlf)
+
+bodyPart = ret <$> mimePartHeaders
+           <*> option [] (crlf *> many octet)
+    where ret hs d = (hs,d)

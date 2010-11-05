@@ -18,6 +18,9 @@ import qualified Data.Text.Encoding as TE
 
 import Network.Parser.Rfc2045
 
+-- We're converting mime types to Haskell Types in order to get rid of
+-- string case conversion...
+
 -- | * Utilities
 string2mimetype :: ByteString -> MimeType
 string2mimetype s = 

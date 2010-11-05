@@ -20,9 +20,9 @@ import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8)
 import Prelude hiding (take, takeWhile)
-import Network.Parser.RfcCommon
+import Network.Parser.RfcCommon hiding (text)
 import Network.Parser.Rfc2234
-import Network.Parser.Rfc2822 (msg_id, comment)
+import Network.Parser.Rfc2822 (msg_id, comment, text)
 import qualified Data.Map as M
 
 -- TODO: implement fields of rfc 822
@@ -35,6 +35,8 @@ import qualified Data.Map as M
 
 --mimePartHeaders = ret <$> entityHeaders <*> option [] fields
 --  where ret eh f = ...
+mimePartHeaders = entityHeaders
+
 --mimeMessageHeaders = ret <$> entityHeaders <*> fields <*> (version <* crlf)
 --  where ret eh f v = ...
 
