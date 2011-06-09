@@ -3,6 +3,8 @@
   , PackageImports
   #-}
 
+-- | Hypertext Transfer Protocol -- HTTP/1.1
+-- <http://www.ietf.org/rfc/rfc2616.txt>
 module Network.Parser.Rfc2616 where
 
 import Control.Applicative hiding (many)

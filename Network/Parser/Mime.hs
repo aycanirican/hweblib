@@ -9,7 +9,7 @@
 module Network.Parser.Mime where
 
 import Data.Attoparsec
-import Data.ByteString as W
+import Data.ByteString
 import Prelude hiding (take, takeWhile)
 import qualified Data.Map as M
 import qualified Data.List as L
@@ -45,7 +45,7 @@ string2mimetype s =
             _ -> MultiPart (Extension s)
       (t, s) -> Other t s
     where
-      paired s = let (a,b) = (T.break "/" . T.toLower . TE.decodeASCII) s in
+      paired s = let (a,b) = (T.break (== '/') . T.toLower . TE.decodeASCII) s in
                  (a, T.drop 1 b)
 
 -- Parse headers and map them to a MimeValue

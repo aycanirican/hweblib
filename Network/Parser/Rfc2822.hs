@@ -3,7 +3,8 @@
   , PackageImports
   #-}
 
--- http://www.ietf.org/rfc/rfc2822.txt
+-- | Internet Message Format
+-- <http://www.ietf.org/rfc/rfc2822.txt>
 
 module Network.Parser.Rfc2822 where
 

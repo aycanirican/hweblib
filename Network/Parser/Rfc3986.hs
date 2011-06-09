@@ -5,15 +5,11 @@
   , TupleSections
   #-}
 
-{-
-
-  http://www.ietf.org/rfc/rfc3986.txt
-
-  TODO: implement ipv6 and ipvfuture
--}
-
+-- | Uniform Resource Identifier (URI): Generic Syntax
+-- <http://www.ietf.org/rfc/rfc3986.txt>
 module Network.Parser.Rfc3986 where
 
+--  TODO: implement ipv6 and ipvfuture
 import Control.Applicative hiding (many)
 import Data.Attoparsec
 --import Data.Attoparsec.Char8

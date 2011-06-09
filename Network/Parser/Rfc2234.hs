@@ -3,10 +3,8 @@
   , PackageImports
   #-}
 
--- | This module implements RFC 2234.
---
--- Augmented BNF for Syntax Specifications: ABNF
--- http://www.ietf.org/rfc/rfc2234.txt
+-- | Augmented BNF for Syntax Specifications: ABNF
+-- <http://www.ietf.org/rfc/rfc2234.txt>
 
 module Network.Parser.Rfc2234 where
 
@@ -50,7 +48,6 @@ octet = anyWord8
 lwsp :: Parser [Word8]
 lwsp = many (wsp <|> crlf *> wsp) <?> "lightweight space"
 {-# INLINE lwsp #-}
-
 
 lf_pred = (== 10)
 -- | Parse a LineFeed

@@ -3,11 +3,9 @@
   , PackageImports
   #-}
 
--- http://www.ietf.org/rfc/rfc2045.txt
---
--- Multipurpose Internet Mail Extensions (MIME) Part One: 
---   Format of Internet Message Bodies
-
+-- | Multipurpose Internet Mail Extensions (MIME) Part One: 
+-- Format of Internet Message Bodies
+-- <http://www.ietf.org/rfc/rfc2045.txt>
 module Network.Parser.Rfc2045 where
 
 import Control.Monad (join)

@@ -3,10 +3,8 @@
   , PackageImports
   #-}
 
--- http://www.ietf.org/rfc/rfc2046.txt
---
--- Multipurpose Internet Mail Extensions (MIME) Part Two: Media Types
-
+-- | Multipurpose Internet Mail Extensions (MIME) Part Two: Media Types
+-- <http://www.ietf.org/rfc/rfc2046.txt>
 module Network.Parser.Rfc2046 where
 
 import Control.Monad (join)
