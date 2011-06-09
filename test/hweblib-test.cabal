@@ -21,7 +21,7 @@ Executable hweblib-test
     base >= 4 && < 5
     , containers
     , bytestring
-    , monads-fd
+    , mtl
     , transformers
     , attoparsec
     , HUnit
@@ -33,7 +33,7 @@ Executable hweblib-benchmark
     base >= 4 && < 5
     , containers
     , bytestring
-    , monads-fd
+    , mtl
     , transformers
     , attoparsec
     , criterion

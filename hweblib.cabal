@@ -32,7 +32,7 @@ Library
     base >= 4 && < 5
     , containers
     , bytestring
-    , monads-fd
+    , mtl 
     , transformers
     , text
     , attoparsec
