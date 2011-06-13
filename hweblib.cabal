@@ -18,7 +18,9 @@ Cabal-version:       >=1.6
 Library
   -- Modules exported by the library.
   Exposed-modules: 
-    Network.Parser.RfcCommon
+      Network.Types
+    , Network.Http 
+    , Network.Parser.RfcCommon
     , Network.Parser.Rfc2234
     , Network.Parser.Rfc2822
     , Network.Parser.Rfc2045

@@ -9,6 +9,7 @@ import Test.HUnit
 import Network.Parser.RfcCommon
 import Network.Parser.Rfc2234
 import Network.Parser.Rfc2616
+import Network.Types
 
 -- Data
 parseGetData = C.concat 

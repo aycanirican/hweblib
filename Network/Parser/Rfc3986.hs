@@ -23,32 +23,9 @@ import Data.Char (digitToInt, isAsciiUpper, isAsciiLower)
 import Data.List (concat)
 import Prelude hiding (take, takeWhile)
 import Data.Typeable (Typeable)
-import Data.Data (Data)
 import qualified Network.Parser.RfcCommon as RC
 import Network.Parser.Rfc2234
-
-data URI = URI
-    { uriScheme     :: String
-    , uriAuthority  :: Maybe URIAuth
-    , uriPath       :: String
-    , uriQuery      :: String
-    , uriFragment   :: String
-    } deriving (Eq, Typeable, Data, Show)
-
-data URIAuth = URIAuth
-    { uriUserInfo   :: String
-    , uriRegName    :: String
-    , uriPort       :: String
-    } deriving (Eq, Typeable, Data, Show)
-
-nullURI :: URI
-nullURI = URI
-    { uriScheme     = ""
-    , uriAuthority  = Nothing
-    , uriPath       = ""
-    , uriQuery      = ""
-    , uriFragment   = ""
-    }
+import Network.Types
 
 -- Prelude.map ord "!$&'()*+,;="
 subDelimsSet = [33,36,38,39,40,41,42,43,44,59,61]

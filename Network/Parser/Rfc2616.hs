@@ -16,12 +16,12 @@ import Data.ByteString.Char8 as C hiding (concat)
 import Data.ByteString.Internal (c2w)
 import Data.Word (Word8())
 import Prelude hiding (take, takeWhile)
-import qualified Network.Parser.Rfc3986 as R3986
 import Network.Parser.RfcCommon
 import Network.Parser.Rfc2234
-import Data.List
--- | Basic Parser Constructs for RFC 2616
+import Network.Types
+import Network.Parser.Rfc3986 as R3986
 
+-- | * Basic Parser Constructs for RFC 2616
 separators_pred, token_pred
  :: Word8 -> Bool
 
@@ -65,6 +65,7 @@ method = (GET         <$ stringCI "get")
          <|> (OPTIONS <$ stringCI "options")
          <|> ((EXTENSIONMETHOD . W.pack) <$> token)
 
+requestUri :: Parser RequestUri
 requestUri = try (Asterisk <$ word8 42)
              <|> AbsoluteUri <$> R3986.absoluteUri
              <|> (AbsolutePath . W.pack) <$> R3986.pathAbsolute
@@ -76,6 +77,7 @@ requestLine = ret <$> method      <* sp
                   <*> httpVersion <* crlf
     where ret m u h = (m,u,h)
 
+headerContentNc_pred :: Word8 -> Bool
 headerContentNc_pred w 
        = (w >= 0x00 && w <= 0x08)
       || (w >= 0x0b && w <= 0x0c)
@@ -83,8 +85,13 @@ headerContentNc_pred w
       || (w >= 0x21 && w <= 0x39)
       || (w >= 0x3b && w <= 0xff)
 
+headerContent :: Parser Word8
 headerContent = satisfy (\w -> headerContentNc_pred w || w == 58) -- ':'
+
+headerName :: Parser [Word8]
 headerName = many1 $ satisfy headerContentNc_pred
+
+headerValue :: Parser [Word8]
 headerValue = do
   c <- headerContent
   r <- option [] (many (headerContent <|> lws)) -- TODO: http://stuff.gsnedders.com/http-parsing.txt
@@ -95,9 +102,13 @@ header = ret <$> headerName  <* (word8 58 <* lwss)
              <*> headerValue <* lwss
     where ret n v = (W.pack n, W.pack v)
 
+entityBody :: Parser [Word8]
 entityBody = many octet
+
+messageBody :: Parser [Word8]
 messageBody = entityBody
 
+request :: Parser Request
 request = do
   (m, ru, v) <- requestLine 
   hdrs <- many (header <* crlf)
@@ -111,25 +122,3 @@ request = do
              , rqBody    = W.empty -- W.pack body
              }
 
--- data HttpMessage = Request | Response
-data Header = GeneralHeader | RequestHeader | EntityHeader
-
-data Request = Request
-    { rqMethod  :: Method
-    , rqUri     :: RequestUri
-    , rqVersion :: (Int, Int)
-    , rqHeaders :: [(ByteString, ByteString)]
-    , rqBody    :: ByteString 
-    } deriving (Eq, Show)
-
-type HttpVersion = (Int,Int)
-data Method = GET | HEAD | POST | PUT | DELETE 
-            | TRACE | OPTIONS | CONNECT 
-            | EXTENSIONMETHOD ByteString
-              deriving (Show,Read,Ord,Eq)
-
-data RequestUri = Asterisk 
-                | AbsoluteUri R3986.URI
-                | AbsolutePath ByteString
-                | Authority (Maybe R3986.URIAuth)
-                  deriving (Eq, Show)
