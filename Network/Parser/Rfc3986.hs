@@ -166,39 +166,3 @@ uri = do
          }
 
 uriReference = uri <|> relativeRef
-
--- | Utility
-
--- instance Show URI where
---     showsPrec _ uri = uriToString defaultUserInfoMap uri
-
--- defaultUserInfoMap :: String -> String
--- defaultUserInfoMap uinf = user++newpass
---     where
---         (user,pass) = Prelude.break (==':') uinf
---         newpass     = if Prelude.null pass || (pass == "@")
---                                            || (pass == ":@")
---                         then pass
---                         else ":...@"
-
--- uriToString :: (String -> String) -> URI -> ShowS
--- uriToString userinfomap URI { uriScheme = scheme
---                             , uriAuthority=authority
---                             , uriPath=path
---                             , uriQuery=query
---                             , uriFragment=fragment
---                             } =
---   (scheme++) . (uriAuthToString userinfomap authority)
---                  . (path++) . (query++) . (fragment++)
-
--- uriAuthToString :: (String->String) -> (Maybe URIAuth) -> ShowS
--- uriAuthToString _           Nothing   = id          -- shows ""
--- uriAuthToString userinfomap
---         (Just URIAuth { uriUserInfo = uinfo
---                       , uriRegName  = regname
---                       , uriPort     = port
---                       } ) =
---     ("//"++) . (if Prelude.null uinfo then id else ((userinfomap uinfo)++))
---              . (regname++)
---              . (":"++)
---              . (port++)
