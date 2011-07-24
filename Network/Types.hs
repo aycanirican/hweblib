@@ -22,16 +22,6 @@ import Control.Exception as Ex
 import Data.Typeable
 import Data.ByteString.Char8 as C
 
--- | HTTP error.
-data HttpError
-    = InvalidRequestError { httpErrorMessage :: String }
-      deriving (Eq, Typeable)
-
-instance Exception HttpError
-
-instance Show HttpError where
-  show (InvalidRequestError msg) = "Invalid HTTP request: " ++ msg
-
 -- | HTTP Version holds major and minor numbers.
 data HttpVersion = 
   HttpVersion { httpMajor :: Int
@@ -47,7 +37,11 @@ http11 :: HttpVersion
 http11 = HttpVersion 1 1
 
 -- data HttpMessage = Request | Response
+
+-- | HTTP Headers
 data Header = GeneralHeader | RequestHeader | EntityHeader
+
+-- | HTTP Methods
 data Method = GET 
             | HEAD 
             | POST 
@@ -57,9 +51,9 @@ data Method = GET
             | OPTIONS 
             | CONNECT 
             | EXTENSIONMETHOD ByteString
-              deriving (Show,Read,Ord,Eq)
+              deriving (Eq, Show)
 
-data Request = 
+data Request =
   Request {
       rqMethod  :: Method                     -- ^ Request Method
     , rqUri     :: RequestUri                 -- ^ Request URI
@@ -68,12 +62,12 @@ data Request =
     , rqBody    :: ByteString                 -- ^ Request Body
     } deriving (Eq, Show)
 
-
-data RequestUri = Asterisk 
-                | AbsoluteUri URI
-                | AbsolutePath ByteString
-                | Authority (Maybe URIAuth)
-                  deriving (Eq, Show)
+data RequestUri = Asterisk                  -- ^ like in OPTIONS * HTTP/1.1
+                | AbsoluteUri URI           -- ^ commonly used in proxy servers
+                | AbsolutePath ByteString   -- ^ like /asd.cgi
+                | RelativeRef URI           -- ^ with a query part like /asd.cgi?foo=bar
+                | Authority (Maybe URIAuth) -- ^ Just the authority part
+                deriving (Eq, Show)
 
 data Response = 
   Response {
@@ -84,18 +78,19 @@ data Response =
   } deriving (Eq, Show)
 
 data URI = URI
-    { uriScheme     :: String
-    , uriAuthority  :: Maybe URIAuth
-    , uriPath       :: String
-    , uriQuery      :: String
-    , uriFragment   :: String
-    } deriving (Eq, Typeable, Show)
+    { uriScheme     :: String        -- ^ Ex: http or https
+    , uriAuthority  :: Maybe URIAuth -- ^ authority = [ userinfo "@" ] host [ ":" port ]
+    , uriPath       :: String        -- ^ Path is the part between the
+                                    -- authority and the query
+    , uriQuery      :: String        -- ^ Query begins with '?'
+    , uriFragment   :: String        -- ^ Fragment begins with '#'
+    } deriving (Eq, Show)
 
 data URIAuth = URIAuth
-    { uriUserInfo   :: String
-    , uriRegName    :: String
-    , uriPort       :: String
-    } deriving (Eq, Typeable, Show)
+    { uriUserInfo   :: String  -- ^ username:password
+    , uriRegName    :: String  -- ^ registered name, ex: www.core.gen.tr
+    , uriPort       :: String  -- ^ Port as a string
+    } deriving (Eq, Show)
 
 nullURI :: URI
 nullURI = URI
@@ -105,3 +100,14 @@ nullURI = URI
     , uriQuery      = ""
     , uriFragment   = ""
     }
+
+-- | HTTP error.
+data HttpError
+    = InvalidRequestError { httpErrorMessage :: String }
+      deriving (Eq, Typeable)
+
+instance Exception HttpError
+
+instance Show HttpError where
+  show (InvalidRequestError msg) = "Invalid HTTP request: " ++ msg
+
