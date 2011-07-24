@@ -3,7 +3,9 @@
 module Network.Types 
        ( -- * HTTP Types
          Method(..)
-       , HttpVersion
+       , HttpVersion(..)
+       , http10
+       , http11
        , Header(..)
        , RequestUri(..)
        , Request(..)
@@ -30,9 +32,22 @@ instance Exception HttpError
 instance Show HttpError where
   show (InvalidRequestError msg) = "Invalid HTTP request: " ++ msg
 
+-- | HTTP Version holds major and minor numbers.
+data HttpVersion = 
+  HttpVersion { httpMajor :: Int
+              , httpMinor :: Int 
+              } deriving (Eq, Show)
+
+-- | HTTP 1.0
+http10 :: HttpVersion
+http10 = HttpVersion 1 0
+
+-- | HTTP 1.1
+http11 :: HttpVersion
+http11 = HttpVersion 1 1
+
 -- data HttpMessage = Request | Response
 data Header = GeneralHeader | RequestHeader | EntityHeader
-type HttpVersion = (Int,Int)
 data Method = GET 
             | HEAD 
             | POST 
@@ -48,7 +63,7 @@ data Request =
   Request {
       rqMethod  :: Method                     -- ^ Request Method
     , rqUri     :: RequestUri                 -- ^ Request URI
-    , rqVersion :: (Int, Int)                 -- ^ HTTP Version as a tuple
+    , rqVersion :: HttpVersion                -- ^ HTTP Version as a tuple
     , rqHeaders :: [(ByteString, ByteString)] -- ^ Request Headers as an alist
     , rqBody    :: ByteString                 -- ^ Request Body
     } deriving (Eq, Show)

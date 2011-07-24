@@ -48,10 +48,9 @@ comment = do
 -- parse (httpVersion) (W.pack "HTTP/12.15\n")
 httpVersion :: Parser HttpVersion
 httpVersion = stringCI "http/" *> 
-              ((,) <$> (num <* sep) <*> num)
+              (HttpVersion <$> (num <* sep) <*> num)
  where num = many1 digit >>= return . read . C.unpack . W.pack
        sep = word8 . c2w $ '.'
-
 
 -- parse (method) (W.pack "GET /")
 method :: Parser Method

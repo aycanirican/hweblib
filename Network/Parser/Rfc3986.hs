@@ -47,7 +47,7 @@ unreserved :: Parser Word8
 unreserved = alpha <|> digit <|> satisfy (inClass "-._~")
 
 pctEncoded :: Parser Word8
-pctEncoded = cat <$> word8 37 
+pctEncoded = cat <$> word8 37
              <*> satisfy hexdig_pred
              <*> satisfy hexdig_pred
   where 
