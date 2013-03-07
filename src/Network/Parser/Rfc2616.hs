@@ -14,7 +14,7 @@ import Data.ByteString as W hiding (concat)
 import Data.ByteString.Char8 as C hiding (concat)
 import Data.ByteString.Internal (c2w)
 import Data.Word (Word8())
-import Prelude hiding (take, takeWthile)
+import Prelude hiding (take, takeWhile)
 import Network.Parser.RfcCommon
 import Network.Parser.Rfc2234
 import Network.Types
