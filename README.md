@@ -3,6 +3,8 @@ hweblib
 
 [![Build Status](https://secure.travis-ci.org/aycanirican/hweblib.png?branch=master)](http://travis-ci.org/aycanirican/hweblib)
 
+[hweblib on Hackage](http://hackage.haskell.org/package/hweblib)
+
 The library includes attoparsec based incremental parsers for rfc2616
 (http) and rfc3986 (uri), rfc2045-46 (mime).
 
