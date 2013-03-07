@@ -15,7 +15,7 @@ Category:            Web
 Build-type:          Simple
 Cabal-version:       >= 1.10
 Tested-With:         GHC==7.6.2, GHC==7.4.2
-Extra-Source-Files:  README
+Extra-Source-Files:  README test/mime-wiki.txt test/benchmark-results.txt
 
 Library
   hs-source-dirs:    src
@@ -49,6 +49,13 @@ Test-suite testsuite
   hs-source-dirs:    src test
   Main-is:           TestSuite.hs
   Default-language:  Haskell2010
+
+  Other-modules: 
+    Test.Parser.Rfc3986
+    Test.Parser.Rfc2045
+    Test.Parser.Rfc2616
+    Test.Parser.Rfc2822
+    Test.Parser.Parser
 
   Build-depends:
     base >= 4 && < 5
