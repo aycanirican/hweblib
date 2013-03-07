@@ -14,7 +14,6 @@ import Control.Applicative hiding (many)
 import Data.Attoparsec
 --import Data.Attoparsec.Char8
 import qualified Data.Attoparsec.Char8 as DAC
-import qualified Data.Attoparsec.FastSet as AF
 import Data.ByteString as W
 import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
@@ -28,14 +27,14 @@ import Network.Parser.Rfc2234
 import Network.Types
 
 -- Prelude.map ord "!$&'()*+,;="
-subDelimsSet = [33,36,38,39,40,41,42,43,44,59,61]
-isSubDelims w = AF.memberWord8 w $ AF.fromList subDelimsSet
+-- subDelimsSet = [33,36,38,39,40,41,42,43,44,59,61]
+isSubDelims = inClass "!$&'()*+,;=" -- AF.memberWord8 w $ AF.fromList subDelimsSet
 subDelims :: Parser Word8
 subDelims =  satisfy isSubDelims
 
 -- Prelude.map ord ":/?#[]@"
-genDelimsSet = [58,47,63,35,91,93,64]
-isGenDelims w = AF.memberWord8 w $ AF.fromList genDelimsSet
+-- genDelimsSet = [58,47,63,35,91,93,64]
+isGenDelims = inClass ":/?#[]@" -- AF.memberWord8 w $ AF.fromList genDelimsSet
 genDelims :: Parser Word8
 genDelims =  satisfy isGenDelims
 
@@ -60,22 +59,22 @@ pctEncoded = cat <$> word8 37
 uchar extras = unreserved <|> pctEncoded <|> subDelims <|> satisfy (inClass extras)
 pchar = uchar ":@"
 fragment :: Parser [Word8]
-fragment = (35:) <$> many (uchar ":@/?")
-query = (63:) <$> many (uchar ":@/?")
+fragment = (35:) <$> many' (uchar ":@/?")
+query = (63:) <$> many' (uchar ":@/?")
 segment, segmentNz, segmentNzNc, slashSegment :: Parser [Word8]
-segment = many pchar
+segment = many' pchar
 segmentNz = many1 pchar
 segmentNzNc = many1 $ uchar "@"
 slashSegment = (:) <$> word8 47 <*> segment
-pathRootless = RC.appcon <$> segmentNz <*> many slashSegment
-pathNoscheme = RC.appcon <$> segmentNzNc <*> many slashSegment
+pathRootless = RC.appcon <$> segmentNz <*> many' slashSegment
+pathNoscheme = RC.appcon <$> segmentNzNc <*> many' slashSegment
 pathAbsolute = (:) <$> word8 47 <*> option [] pathRootless
-pathAbempty = Prelude.concat <$> many slashSegment
-regName = many (unreserved <|> pctEncoded <|> subDelims)
+pathAbempty = Prelude.concat <$> many' slashSegment
+regName = many' (unreserved <|> pctEncoded <|> subDelims)
 
 decOctet :: Parser [Word8]
 decOctet = do
-  x <- many digit
+  x <- many' digit
   if read (C.unpack . W.pack $ x) > 255 
     then fail "error decOctet"
     else return x
@@ -87,13 +86,13 @@ ipv4address = ret <$> decOctet <* word8 46
                   <*> decOctet
   where ret a b c d = a++[46]++b++[46]++c++[46]++d
 
-port = many digit
+port = many' digit
 
 -- TODO: IP-literal
 -- host = ipLiteral <|> ipv4address <|> regName
 host = regName <|> ipv4address
 userinfo = do
-  uu <- many (unreserved <|> pctEncoded <|> subDelims <|> word8 58)
+  uu <- many' (unreserved <|> pctEncoded <|> subDelims <|> word8 58)
   word8 64
   return uu
 
@@ -108,7 +107,7 @@ authority = do
             , uriPort     = C.unpack $ W.pack up
             }
 
-scheme = (:) <$> alpha <*> many (alpha <|> digit <|> satisfy (inClass "+-."))
+scheme = (:) <$> alpha <*> many' (alpha <|> digit <|> satisfy (inClass "+-."))
 
 relativePart = do try (word8 47 *> word8 47)
                   uu <- option Nothing authority

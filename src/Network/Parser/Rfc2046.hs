@@ -11,7 +11,6 @@ import Control.Monad (join)
 import Control.Applicative as A hiding (many)
 import Data.Attoparsec
 import qualified Data.Attoparsec.Char8 as AC
-import qualified Data.Attoparsec.FastSet as F (fromList, memberWord8)
 import Data.ByteString as W
 import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
@@ -25,12 +24,12 @@ import qualified Data.Map as M
 import Prelude hiding (id)
 
 -- Prelude.map Data.Char.ord "'()+_,-./:=?"
-bcharsnospaceSet' :: [Word8]
-bcharsnospaceSet' = [39,40,41,43,95,44,45,46,47,58,61,63]
+-- bcharsnospaceSet' :: [Word8]
+-- bcharsnospaceSet' = [39,40,41,43,95,44,45,46,47,58,61,63]
 bcharsnospace_pred :: Word8 -> Bool
 bcharsnospace_pred w = digit_pred w 
                        || alpha_pred w
-                       || F.memberWord8 w (F.fromList bcharsnospaceSet')
+                       || inClass "'()+_,-./:=?" w -- F.memberWord8 w (F.fromList bcharsnospaceSet')
 bcharsnospace :: Parser Word8
 bcharsnospace = satisfy bcharsnospace_pred
 
@@ -50,5 +49,5 @@ delimiter = crlf *> dashBoundary
 --   where line = option 32 (many text *> crlf)
 
 bodyPart = ret <$> mimePartHeaders
-           <*> option [] (crlf *> many octet)
+           <*> option [] (crlf *> many' octet)
     where ret hs d = (hs,d)

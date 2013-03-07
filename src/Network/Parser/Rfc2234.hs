@@ -46,7 +46,7 @@ octet = anyWord8
 
 -- | Parse a Lightweight Space
 lwsp :: Parser [Word8]
-lwsp = many (wsp <|> crlf *> wsp) <?> "lightweight space"
+lwsp = many' (wsp <|> crlf *> wsp) <?> "lightweight space"
 {-# INLINE lwsp #-}
 
 lf_pred = (== 10)
@@ -132,7 +132,7 @@ alpha = satisfy alpha_pred
 manyN :: Int -> Parser a -> Parser [a]
 manyN n p
     | n <= 0    = return []
-    | otherwise = (++) <$> count n p <*> many p
+    | otherwise = (++) <$> count n p <*> many' p
 {-# INLINE manyN #-}
 
 -- | Match a parser at least @N@ times, but no more than @M@ times.

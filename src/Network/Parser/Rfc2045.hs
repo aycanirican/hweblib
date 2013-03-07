@@ -11,8 +11,7 @@ module Network.Parser.Rfc2045 where
 import Control.Monad (join)
 import Control.Applicative as A hiding (many)
 import Data.Attoparsec
-import qualified Data.Attoparsec.Char8 as AC
-import qualified Data.Attoparsec.FastSet as F (fromList, memberWord8)
+import qualified Data.Attoparsec.ByteString.Char8 as AC
 import Data.ByteString as W
 import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
@@ -65,10 +64,10 @@ ianaToken :: Parser ByteString
 ianaToken = A.empty
 
 -- Prelude.map Data.Char.ord "()<>@,;:\\\"/[]?="
-tspecialsSet ::[Word8]
-tspecialsSet = [40,41,60,62,64,44,59,58,92,34,47,91,93,63,61]
+-- tspecialsSet ::[Word8]
+-- tspecialsSet = [40,41,60,62,64,44,59,58,92,34,47,91,93,63,61]
 tspecials_pred :: Word8 -> Bool
-tspecials_pred w = F.memberWord8 w (F.fromList tspecialsSet)
+tspecials_pred = inClass "()<>@,;:\\\"/[]?=" -- F.memberWord8 w (F.fromList tspecialsSet)
 tspecials :: Parser Word8
 tspecials = satisfy tspecials_pred
 
@@ -115,7 +114,7 @@ extensionToken = xToken
 content :: Parser Header
 content = res <$> (AC.stringCI "content-type" *> colonsp *> mtype)
           <*> (word8 47 *> subtype)
-          <*> many (semicolonsp *> parameter)
+          <*> many' (semicolonsp *> parameter)
     where res a b ps = Header ContentH (C.concat [a, "/", b]) (M.fromList ps)
 
 -- * 6. Content-Transfer-Encoding Header Type
@@ -154,10 +153,10 @@ ptext :: Parser Word8
 ptext = hexOctet <|> safeChar
 
 qpSection :: Parser [Word8]
-qpSection = many (ptext <|> sp <|> ht)
+qpSection = many' (ptext <|> sp <|> ht)
 
 qpSegment :: Parser [Word8]
-qpSegment = ret <$> qpSection <*> many (sp <|> ht) <*> word8 61
+qpSegment = ret <$> qpSection <*> many' (sp <|> ht) <*> word8 61
     where ret a [] _ = a
           ret a _  _ = a ++ [32]
 
@@ -166,13 +165,13 @@ qpPart = qpSection
 
 qpLine :: Parser [Word8]
 qpLine = do
-  a <- many $ (++) <$> qpSegment <*> (transportPadding <* crlf)
+  a <- many' $ (++) <$> qpSegment <*> (transportPadding <* crlf)
   b <- (++) <$> qpPart <*> transportPadding
   return $ join a ++ b
 
 quotedPrintable :: Parser ByteString
 quotedPrintable = do 
-  a <- appcon <$> qpLine <*> many (crlf *> qpLine)
+  a <- appcon <$> qpLine <*> many' (crlf *> qpLine)
   return $ W.pack a
 
 -- * 7.  Content-ID Header Field
@@ -183,7 +182,7 @@ contentId = ret <$> (AC.stringCI "content-id" *> colonsp *> msg_id)
 -- * 8.  Content-Description Header Field
 -- TODO: support 2047 encoding
 description :: Parser Header
-description = ret <$> (AC.stringCI "content-description" *> colonsp *> many text)
+description = ret <$> (AC.stringCI "content-description" *> colonsp *> many' text)
     where ret d = Header DescriptionH (W.pack d) M.empty
 
 -- * 9. Additional MIME Header Fields
@@ -191,7 +190,7 @@ description = ret <$> (AC.stringCI "content-description" *> colonsp *> many text
 mimeExtensionField :: Parser Header
 mimeExtensionField = do
   k <- AC.stringCI "content-" *> token
-  v <- colonsp *> many text
+  v <- colonsp *> many' text
   return $ Header (ExtensionH $ W.pack k)  (W.pack v) M.empty
 
 -- * Utilities

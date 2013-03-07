@@ -9,13 +9,12 @@ module Network.Parser.Rfc2616 where
 
 import Control.Applicative hiding (many)
 import Data.Attoparsec
-import Data.Attoparsec.FastSet (memberWord8, fromList)
 import Data.Attoparsec.Char8 (stringCI)
 import Data.ByteString as W hiding (concat)
 import Data.ByteString.Char8 as C hiding (concat)
 import Data.ByteString.Internal (c2w)
 import Data.Word (Word8())
-import Prelude hiding (take, takeWhile)
+import Prelude hiding (take, takeWthile)
 import Network.Parser.RfcCommon
 import Network.Parser.Rfc2234
 import Network.Types
@@ -31,9 +30,9 @@ token = many1 $ satisfy token_pred
 {-# INLINE token #-}
 
 -- "()<>@,;:\\\"/[]?={} \t"
-separatorSet :: [Word8]
-separatorSet = [40,41,60,62,64,44,59,58,92,34,47,91,93,63,61,123,125,32,9]
-separators_pred w = memberWord8 w (fromList separatorSet)
+-- separatorSet :: [Word8]
+-- separatorSet = [40,41,60,62,64,44,59,58,92,34,47,91,93,63,61,123,125,32,9]
+separators_pred = inClass "()<>@,;:\\\"/[]?={} \t" -- memberWord8 w (fromList separatorSet)
 separators :: Parser Word8
 separators = satisfy separators_pred
 {-# INLINE separators #-}
@@ -41,7 +40,7 @@ separators = satisfy separators_pred
 comment :: Parser [Word8]
 comment = do 
   word8 40 
-  r <- concat <$> many (quotedPair <|> ((:[]) <$> ctext))
+  r <- concat <$> many' (quotedPair <|> ((:[]) <$> ctext))
   word8 41
   return r
 
@@ -95,7 +94,7 @@ headerName = many1 $ satisfy headerContentNc_pred
 headerValue :: Parser [Word8]
 headerValue = do
   c <- headerContent
-  r <- option [] (many (headerContent <|> lws)) -- TODO: http://stuff.gsnedders.com/http-parsing.txt
+  r <- option [] (many' (headerContent <|> lws)) -- TODO: http://stuff.gsnedders.com/http-parsing.txt
   return (c:r)
 
 header :: Parser (ByteString,ByteString)
@@ -104,7 +103,7 @@ header = ret <$> headerName  <* (word8 58 <* lwss)
     where ret n v = (W.pack n, W.pack v)
 
 entityBody :: Parser [Word8]
-entityBody = many octet
+entityBody = many' octet
 
 messageBody :: Parser [Word8]
 messageBody = entityBody
@@ -112,7 +111,7 @@ messageBody = entityBody
 request :: Parser Request
 request = do
   (m, ru, v) <- requestLine 
-  hdrs <- many (header <* crlf)
+  hdrs <- many' (header <* crlf)
   crlf
 --  body <- option [] messageBody
   return $ Request

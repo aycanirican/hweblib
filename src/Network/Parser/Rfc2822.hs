@@ -12,7 +12,6 @@ import Control.Monad (join)
 import Control.Applicative as A hiding (many)
 import Data.Attoparsec
 import qualified Data.Attoparsec.Char8 as AC
-import qualified Data.Attoparsec.FastSet as F (fromList, memberWord8)
 import Data.ByteString as W hiding (concat,intersperse, group)
 import Data.ByteString.Char8 as C hiding (concat,intersperse,group)
 import Data.ByteString.Internal (c2w, w2c)
@@ -23,8 +22,6 @@ import Network.Parser.Rfc2234
 import qualified Data.Map as M
 import Prelude hiding (id)
 import Data.List hiding (group)
-
-
 
 -- | * 3.2.1. Primitive Tokens
 no_ws_ctl_pred w = w == 32 || ctl_pred w
@@ -39,11 +36,11 @@ text = satisfy $ \w ->
 
 -- Prelude.map Data.Char.ord "()<>[]:;@\\,.\""
 
-specialsSet ::[Word8]
-specialsSet = [40,41,60,62,91,93,58,59,64,92,44,46,34]
+-- specialsSet ::[Word8]
+-- specialsSet = [40,41,60,62,91,93,58,59,64,92,44,46,34]
 
 specials_pred :: Word8 -> Bool
-specials_pred w = F.memberWord8 w (F.fromList specialsSet)
+specials_pred = inClass "()<>[]:;@\\,.\"" -- F.memberWord8 w (F.fromList specialsSet)
 
 -- | Parse a special
 specials :: Parser Word8
@@ -71,7 +68,7 @@ ctext = crlf <|> no_ws_ctl <|> satisfy rest
 comment :: Parser [Word8]
 comment = do
   word8 40
-  r1 <- many ccontent
+  r1 <- many' ccontent
   r2 <- option [] fws
   word8 41
   return $ (join r1) ++ r2
@@ -111,10 +108,10 @@ qcontent = option [] (asList qtext) <|> quotedPair
 quoted_string = do
   option [] cfws
   dquote
-  r1 <- concat <$> many (do r1 <- option [] fws
-                            r2 <- qcontent
-                            return (r1 ++ r2)
-                        )
+  r1 <- concat <$> many' (do
+                          r1 <- option [] fws
+                          r2 <- qcontent
+                          return (r1 ++ r2))
   r2 <- option [] fws
   dquote
   option [] cfws
@@ -179,7 +176,7 @@ domain = dot_atom <|> domain_literal
 domain_literal = do
   option [] cfws
   word8 91
-  r <- many (option [] fws *> dcontent)
+  r <- many' (option [] fws *> dcontent)
   word8 92
   return $ [91] ++ concat r ++ [92]
 dcontent = try (do r <- dtext
@@ -210,13 +207,13 @@ id_right = dot_atom_text <|> no_fold_literal
 
 no_fold_quote = do
   l <- dquote
-  m <- concat <$> many (option [] (asList qtext) <|> quotedPair)
+  m <- concat <$> many' (option [] (asList qtext) <|> quotedPair)
   r <- dquote
   return $ [l] ++ m ++ [r]
 
 no_fold_literal = do
   l <- word8 91 -- '['
-  m <- concat <$> many (option [] (asList dtext) <|> quotedPair)
+  m <- concat <$> many' (option [] (asList dtext) <|> quotedPair)
   r <- word8 93 -- ']'
   return $ [l] ++ m ++ [r]
 

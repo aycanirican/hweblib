@@ -11,10 +11,9 @@ module Network.Parser.RfcCommon where
 
 import Control.Applicative hiding (many)
 import Data.Attoparsec as AW
-import Data.Attoparsec.Combinator as DACO
+import Data.Attoparsec.Combinator
 import Data.Attoparsec.Char8 as AC hiding (digit, char)
-import qualified Data.Attoparsec.Char8 as DAC
-import qualified Data.Attoparsec.FastSet as AF
+import qualified Data.Attoparsec.ByteString as DAC
 import Data.ByteString as W
 import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
@@ -44,7 +43,7 @@ lws = (try (crlf *> s) <|> s) *> return 32 <?> "lightweight space"
 -- | consecutive matches of lws rule, where they MUST be compressed to
 -- a single 0x20 byte
 lwss :: Parser Word8
-lwss = return 32 <$> many lws
+lwss = return 32 <$> many' lws
 {-# INLINE lwss #-}
 
 -- | Parse a character but not a control or parenthesis
@@ -72,12 +71,11 @@ quotedPair = ret <$> word8 92 <*> char
 -- | Parse quoted string
 quotedString :: Parser [Word8]
 quotedString = do
-  word8 34 
-  r <- many (do a <- option [] quotedPair 
-                b <- qdtext
-                return $ a ++ [b]
-            )
-  word8 34
+  r <- word8 34 *> manyTill (do 
+                             a <- option [] quotedPair 
+                             b <- qdtext
+                             return $ a ++ [b]) 
+                            (word8 34)
   return . join $ r
 {-# INLINE quotedString #-}
 
