@@ -43,7 +43,7 @@ string2mimetype s =
             _ -> MultiPart (Extension s)
       (t, s) -> Other t s
     where
-      paired s = let (a,b) = (T.break (== '/') . T.toLower . TE.decodeASCII) s in
+      paired s = let (a,b) = (T.break (== '/') . T.toLower . TE.decodeLatin1) s in
                  (a, T.drop 1 b)
 
 -- Parse headers and map them to a MimeValue
@@ -52,9 +52,9 @@ parseMimeHeaders = do
   eh <- entityHeaders
   let mv = L.foldl f nullMimeValue eh
   return mv
-  where 
-    bs2t = M.fromList . Prelude.map (TE.decodeASCII *** TE.decodeASCII) . M.toList
-    hVal = TE.decodeASCII . hValue
+  where
+    bs2t = M.fromList . Prelude.map (TE.decodeLatin1 *** TE.decodeLatin1) . M.toList
+    hVal = TE.decodeLatin1 . hValue
     f z x = 
         case hType x of
           IdH -> z { mvHeaders = M.insert IdH (hVal x) (mvHeaders z) }
