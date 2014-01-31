@@ -1,7 +1,5 @@
 {-# LANGUAGE 
     OverloadedStrings
-  , PackageImports
-  , DeriveDataTypeable
   , TupleSections
   #-}
 
@@ -121,14 +119,14 @@ relativeRef = do
   (ua,up) <- relativePart
   uq <- option [] (word8 63 *> query)
   uf <- option [] (word8 35 *> fragment)
-  return $ URI { uriScheme = RC.toRepr []
-               , uriAuthority = ua
-               , uriPath = RC.toRepr up
-               , uriQuery = RC.toRepr uq
-               , uriFragment = RC.toRepr uf
-               }
+  return URI { uriScheme = RC.toRepr []
+             , uriAuthority = ua
+             , uriPath = RC.toRepr up
+             , uriQuery = RC.toRepr uq
+             , uriFragment = RC.toRepr uf
+             }
 
-hierPart :: Parser ((Maybe URIAuth), [Word8])
+hierPart :: Parser (Maybe URIAuth, [Word8])
 hierPart = do try (word8 47 *> word8 47)
               uu <- option Nothing authority
               pa <- pathAbempty
@@ -143,12 +141,12 @@ absoluteUri = do
   word8 58
   (ua,up) <- hierPart
   uq <- option [] (word8 63 *> query)
-  return $ URI { uriScheme = RC.toRepr us
-               , uriAuthority = ua
-               , uriPath = RC.toRepr up
-               , uriQuery = RC.toRepr uq
-               , uriFragment = RC.toRepr []
-               }
+  return URI { uriScheme = RC.toRepr us
+             , uriAuthority = ua
+             , uriPath = RC.toRepr up
+             , uriQuery = RC.toRepr uq
+             , uriFragment = RC.toRepr []
+             }
 
 uri = do
   us <- scheme
@@ -156,7 +154,7 @@ uri = do
   (ua,up) <- hierPart
   uq <- option [] (word8 63 *> query)
   uf <- option [] (word8 35 *> fragment)
-  return $ URI
+  return URI
          { uriScheme = RC.toRepr us
          , uriAuthority = ua
          , uriPath = RC.toRepr up

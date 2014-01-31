@@ -1,12 +1,10 @@
-{-# LANGUAGE 
-    OverloadedStrings
-  , PackageImports
-  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Hypertext Transfer Protocol -- HTTP/1.1
 -- <http://www.ietf.org/rfc/rfc2616.txt>
 module Network.Parser.Rfc2616 where
 
+import Control.Monad (liftM)
 import Control.Applicative hiding (many)
 import Data.Attoparsec
 import Data.Attoparsec.Char8 (stringCI)
@@ -48,7 +46,7 @@ comment = do
 httpVersion :: Parser HttpVersion
 httpVersion = stringCI "http/" *> 
               (HttpVersion <$> (num <* sep) <*> num)
- where num = many1 digit >>= return . read . C.unpack . W.pack
+ where num = liftM (read . C.unpack . W.pack) $ many1 digit
        sep = word8 . c2w $ '.'
 
 -- parse (method) (W.pack "GET /")
@@ -114,11 +112,11 @@ request = do
   hdrs <- many' (header <* crlf)
   crlf
 --  body <- option [] messageBody
-  return $ Request
-             { rqMethod  = m
-             , rqUri     = ru
-             , rqVersion = v
-             , rqHeaders = hdrs
-             , rqBody    = W.empty -- W.pack body
-             }
+  return Request
+           { rqMethod  = m
+           , rqUri     = ru
+           , rqVersion = v
+           , rqHeaders = hdrs
+           , rqBody    = W.empty -- W.pack body
+           }
 

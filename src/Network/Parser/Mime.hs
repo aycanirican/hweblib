@@ -1,13 +1,11 @@
-{-# LANGUAGE 
-    OverloadedStrings
-  , PackageImports
-  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- http://www.ietf.org/rfc/rfc2045.txt
 -- http://www.ietf.org/rfc/rfc2046.txt
 
 module Network.Parser.Mime where
 
+import Control.Arrow ((***))
 import Data.Attoparsec
 import Data.ByteString
 import Prelude hiding (take, takeWhile)
@@ -55,7 +53,7 @@ parseMimeHeaders = do
   let mv = L.foldl f nullMimeValue eh
   return mv
   where 
-    bs2t = M.fromList . Prelude.map (\(a,b) -> (TE.decodeASCII a, TE.decodeASCII b)) . M.toList
+    bs2t = M.fromList . Prelude.map (TE.decodeASCII *** TE.decodeASCII) . M.toList
     hVal = TE.decodeASCII . hValue
     f z x = 
         case hType x of

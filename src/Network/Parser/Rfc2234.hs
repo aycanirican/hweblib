@@ -1,7 +1,4 @@
-{-# LANGUAGE 
-    OverloadedStrings
-  , PackageImports
-  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Augmented BNF for Syntax Specifications: ABNF
 -- <http://www.ietf.org/rfc/rfc2234.txt>
@@ -27,7 +24,7 @@ wsp :: Parser Word8
 wsp = sp <|> ht
 {-# INLINE wsp #-}
 
-vchar_pred w = (w >= 0x21 && w <= 0x7e)
+vchar_pred w = w >= 0x21 && w <= 0x7e
 -- | Parse a Visible Character
 vchar :: Parser Word8
 vchar = satisfy vchar_pred
@@ -141,6 +138,6 @@ manyNtoM n m p
     | n <  0    = return []
     | n >  m    = return []
     | n == m    = count n p
-    | n == 0    = do foldr (<|>) (return []) (map (\x -> try $ count x p) (Prelude.reverse [1..m]))
+    | n == 0    = foldr (<|>) (return []) (map (\x -> try $ count x p) (Prelude.reverse [1..m]))
     | otherwise = (++) <$> count n p <*> manyNtoM 0 (m - n) p
 {-# INLINE manyNtoM #-}

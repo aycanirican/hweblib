@@ -1,7 +1,4 @@
-{-# LANGUAGE 
-    OverloadedStrings
-  , PackageImports
-  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Multipurpose Internet Mail Extensions (MIME) Part Two: Media Types
 -- <http://www.ietf.org/rfc/rfc2046.txt>

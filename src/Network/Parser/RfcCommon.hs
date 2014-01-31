@@ -1,7 +1,5 @@
 {-# LANGUAGE 
     OverloadedStrings
-  , PackageImports
-  , DeriveDataTypeable
   , TupleSections
   #-}
 
@@ -65,7 +63,7 @@ qdtext = crlf <|> AW.satisfy char_not_ctl_or_dquote
 -- | Parse quoted pair
 quotedPair :: Parser [Word8]
 quotedPair = ret <$> word8 92 <*> char
-    where ret a b = a:b:[]
+    where ret a b = [a,b]
 {-# INLINE quotedPair #-}
 
 -- | Parse quoted string

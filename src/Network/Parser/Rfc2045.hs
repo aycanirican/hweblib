@@ -1,7 +1,4 @@
-{-# LANGUAGE 
-    OverloadedStrings
-  , PackageImports
-  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Multipurpose Internet Mail Extensions (MIME) Part One: 
 -- Format of Internet Message Bodies

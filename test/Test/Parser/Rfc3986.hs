@@ -14,12 +14,12 @@ tests = TestList $ fmap TestCase lst
 lst = [test_simple_query, test_simple_query, test_uri]
 test_uri 
     = let i = "http://user:pass@www.core.gen.tr/dir1/file.ext?param1=val1&param2=val2 "
-          o = Just $ URI { uriScheme = "http"
-                         , uriAuthority = Just $ URIAuth "user:pass" "www.core.gen.tr" ""
-                         , uriPath = "/dir1/file.ext"
-                         , uriQuery = "?param1=val1&param2=val2"
-                         , uriFragment = ""
-                         }
+          o = Just URI { uriScheme = "http"
+                       , uriAuthority = Just $ URIAuth "user:pass" "www.core.gen.tr" ""
+                       , uriPath = "/dir1/file.ext"
+                       , uriQuery = "?param1=val1&param2=val2"
+                       , uriFragment = ""
+                       }
       in
         assertEqual "uri" o (aP uri i)
 

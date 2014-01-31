@@ -1,7 +1,4 @@
-{-# LANGUAGE 
-    OverloadedStrings
-  , PackageImports
-  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- | Internet Message Format
 -- <http://www.ietf.org/rfc/rfc2822.txt>
@@ -54,7 +51,7 @@ wsps = many1 wsp
 
 -- | Parse Folding Whitespace
 fws :: Parser [Word8]
-fws = return [32] <$> many1 (choice [wsps, (crlf *> wsps)])
+fws = return [32] <$> many1 (choice [wsps, crlf *> wsps])
 
 -- | Parse ctext
 ctext :: Parser Word8
@@ -71,7 +68,7 @@ comment = do
   r1 <- many' ccontent
   r2 <- option [] fws
   word8 41
-  return $ (join r1) ++ r2
+  return $ join r1 ++ r2
     where
       ccontent :: Parser [Word8]
       ccontent = try $ do r1 <- option [] fws
@@ -88,7 +85,7 @@ atom :: Parser [Word8]
 atom = option [] cfws *> many1 atext <* option [] cfws
 
 dot_atom_text :: Parser [Word8]
-dot_atom_text = concat . intersperse [46] <$> sepBy (many1 atext) (word8 46)
+dot_atom_text = Data.List.intercalate [46] <$> sepBy (many1 atext) (word8 46)
 
 dot_atom :: Parser [Word8]
 dot_atom = option [] cfws *> dot_atom_text <* option [] cfws
@@ -137,10 +134,9 @@ mailbox = try name_addr
 name_addr :: Parser NameAddress
 name_addr = do n <- option [] display_name
                a <- angle_addr
-               if Data.List.null n
-                 then return (NameAddress Nothing (W.pack a))
-                 else return (NameAddress (Just . W.pack $ n) (W.pack a))
-               
+               return $ if Data.List.null n
+                          then NameAddress Nothing (W.pack a)
+                          else NameAddress (Just . W.pack $ n) (W.pack a)
 
 angle_addr :: Parser [Word8]
 angle_addr = do
@@ -162,7 +158,7 @@ group = do
   return r
 
 display_name = ret <$> phrase
-    where ret l = concat . intersperse [32] $ l
+    where ret = Data.List.intercalate [32]
 
 mailbox_list = sepBy mailbox (word8 44)
 address_list = sepBy address (word8 44)

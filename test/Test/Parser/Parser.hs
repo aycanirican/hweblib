@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, PackageImports #-}
+{-# LANGUAGE OverloadedStrings #-}
 module Test.Parser.Parser where
 
 import Data.Attoparsec
@@ -9,7 +9,7 @@ import Data.Word
 import Test.HUnit
 
 aP :: (Eq a) => Parser a -> ByteString -> Maybe a
-aP p i = case (parse p i) of
+aP p i = case parse p i of
            Done _ r -> return r
            _        -> fail "failed"
 
