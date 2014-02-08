@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module Test.Parser.Rfc2616 where
 --------------------------------------------------------------------------------
 import Data.Attoparsec
@@ -6,6 +7,7 @@ import Data.ByteString as W
 import qualified Data.ByteString.Char8 as C
 import Test.Parser.Parser
 import Test.HUnit
+--------------------------------------------------------------------------------
 import Network.Parser.RfcCommon
 import Network.Parser.Rfc2234
 import Network.Parser.Rfc2616
