@@ -1,16 +1,17 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Test.Parser.Rfc2045 where
-
+--------------------------------------------------------------------------------
 import Data.Attoparsec
 import Data.ByteString as W
 import qualified Data.ByteString.Char8 as C
 import Test.Parser.Parser
 import Test.HUnit
+import qualified Data.Map as M
+--------------------------------------------------------------------------------
 import Network.Parser.Rfc2045
 import Network.Parser.Rfc2234
 import Network.Parser.RfcCommon
-import qualified Data.Map as M
-
+--------------------------------------------------------------------------------
 tests = TestList $ fmap TestCase lst
 lst = [test_version, test_quotedPrintable]
 
