@@ -1,16 +1,14 @@
-{-# LANGUAGE 
-    OverloadedStrings
-  , TupleSections
-  #-}
+{-# LANGUAGE OverloadedStrings, TupleSections #-}
 
 -- | Uniform Resource Identifier (URI): Generic Syntax
 -- <http://www.ietf.org/rfc/rfc3986.txt>
+--  TODO: implement ipv6 and ipvfuture
+
 module Network.Parser.Rfc3986 where
 
---  TODO: implement ipv6 and ipvfuture
+--------------------------------------------------------------------------------
 import Control.Applicative hiding (many)
 import Data.Attoparsec
---import Data.Attoparsec.Char8
 import qualified Data.Attoparsec.Char8 as DAC
 import Data.ByteString as W
 import Data.ByteString.Char8 as C
@@ -20,9 +18,11 @@ import Data.Char (digitToInt, isAsciiUpper, isAsciiLower)
 import Data.List (concat)
 import Prelude hiding (take, takeWhile)
 import Data.Typeable (Typeable)
+--------------------------------------------------------------------------------
 import qualified Network.Parser.RfcCommon as RC
 import Network.Parser.Rfc2234
 import Network.Types
+--------------------------------------------------------------------------------
 
 -- Prelude.map ord "!$&'()*+,;="
 -- subDelimsSet = [33,36,38,39,40,41,42,43,44,59,61]

@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module Test.Parser.Rfc3986 where
 --------------------------------------------------------------------------------
 import Data.Attoparsec

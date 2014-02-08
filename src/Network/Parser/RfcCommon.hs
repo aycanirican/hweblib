@@ -25,7 +25,7 @@ import Data.Data (Data)
 import Network.Parser.Rfc2234
 --------------------------------------------------------------------------------
 ----
--- * Common Parsers
+-- | Common Parsers
 ----
 
 -- | Parse at least one hex digit.
@@ -85,7 +85,7 @@ text = crlf <|> AW.satisfy char_not_ctl
 {-# INLINE text #-}
 
 --------------
--- * Utilities
+-- | Utilities
 --------------
 
 appcon :: [a] -> [[a]] -> [a]
