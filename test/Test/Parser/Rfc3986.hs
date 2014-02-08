@@ -6,6 +6,7 @@ import qualified Data.ByteString.Char8 as C
 import Network.Parser.RfcCommon
 import Test.Parser.Parser
 import Test.HUnit
+--------------------------------------------------------------------------------
 import Network.Types
 import Network.Parser.Rfc3986
 --------------------------------------------------------------------------------
