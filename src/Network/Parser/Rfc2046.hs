@@ -3,7 +3,7 @@
 -- | Multipurpose Internet Mail Extensions (MIME) Part Two: Media Types
 -- <http://www.ietf.org/rfc/rfc2046.txt>
 module Network.Parser.Rfc2046 where
-
+--------------------------------------------------------------------------------
 import Control.Monad (join)
 import Control.Applicative as A hiding (many)
 import Data.Attoparsec
@@ -13,13 +13,14 @@ import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8)
 import Prelude hiding (take, takeWhile)
+import qualified Data.Map as M
+import Prelude hiding (id)
+--------------------------------------------------------------------------------
 import Network.Parser.RfcCommon hiding (text)
 import Network.Parser.Rfc2234
 import Network.Parser.Rfc2045
 import Network.Parser.Rfc2822
-import qualified Data.Map as M
-import Prelude hiding (id)
-
+--------------------------------------------------------------------------------
 -- Prelude.map Data.Char.ord "'()+_,-./:=?"
 -- bcharsnospaceSet' :: [Word8]
 -- bcharsnospaceSet' = [39,40,41,43,95,44,45,46,47,58,61,63]

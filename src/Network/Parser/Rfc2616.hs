@@ -3,7 +3,7 @@
 -- | Hypertext Transfer Protocol -- HTTP/1.1
 -- <http://www.ietf.org/rfc/rfc2616.txt>
 module Network.Parser.Rfc2616 where
-
+--------------------------------------------------------------------------------
 import Control.Monad (liftM)
 import Control.Applicative hiding (many)
 import Data.Attoparsec
@@ -13,11 +13,12 @@ import Data.ByteString.Char8 as C hiding (concat)
 import Data.ByteString.Internal (c2w)
 import Data.Word (Word8())
 import Prelude hiding (take, takeWhile)
+--------------------------------------------------------------------------------
 import Network.Parser.RfcCommon
 import Network.Parser.Rfc2234
 import Network.Types
 import Network.Parser.Rfc3986 as R3986
-
+--------------------------------------------------------------------------------
 -- | * Basic Parser Constructs for RFC 2616
 separators_pred, token_pred
  :: Word8 -> Bool

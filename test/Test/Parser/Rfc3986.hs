@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Test.Parser.Rfc3986 where
-
+--------------------------------------------------------------------------------
 import Data.Attoparsec
 import qualified Data.ByteString.Char8 as C
 import Network.Parser.RfcCommon
@@ -8,7 +8,7 @@ import Test.Parser.Parser
 import Test.HUnit
 import Network.Types
 import Network.Parser.Rfc3986
-
+--------------------------------------------------------------------------------
 tests = TestList $ fmap TestCase lst
 
 lst = [test_simple_query, test_simple_query, test_uri]

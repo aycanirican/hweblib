@@ -4,11 +4,11 @@
 -- <http://www.ietf.org/rfc/rfc2234.txt>
 
 module Network.Parser.Rfc2234 where
-
+--------------------------------------------------------------------------------
 import Control.Applicative hiding (many)
 import Data.Attoparsec
 import Data.Word (Word8)
-
+--------------------------------------------------------------------------------
 --
 -- * Primitive Parsers (6.1 Core Rules)
 --

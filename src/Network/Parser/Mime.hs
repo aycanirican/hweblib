@@ -4,7 +4,7 @@
 -- http://www.ietf.org/rfc/rfc2046.txt
 
 module Network.Parser.Mime where
-
+--------------------------------------------------------------------------------
 import Control.Arrow ((***))
 import Data.Attoparsec
 import Data.ByteString
@@ -13,9 +13,9 @@ import qualified Data.Map as M
 import qualified Data.List as L
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-
+--------------------------------------------------------------------------------
 import Network.Parser.Rfc2045
-
+--------------------------------------------------------------------------------
 -- We're converting mime types to Haskell Types in order to get rid of
 -- string case conversion...
 

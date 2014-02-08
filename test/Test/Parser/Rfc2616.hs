@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Test.Parser.Rfc2616 where
-
+--------------------------------------------------------------------------------
 import Data.Attoparsec
 import Data.ByteString as W
 import qualified Data.ByteString.Char8 as C
@@ -10,7 +10,7 @@ import Network.Parser.RfcCommon
 import Network.Parser.Rfc2234
 import Network.Parser.Rfc2616
 import Network.Types
-
+--------------------------------------------------------------------------------
 -- Data
 parseGetData = C.concat 
                [ "GET /favicon.ico HTTP/1.1\r\n"

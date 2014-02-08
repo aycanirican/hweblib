@@ -4,7 +4,7 @@
 -- <http://www.ietf.org/rfc/rfc2822.txt>
 
 module Network.Parser.Rfc2822 where
-
+--------------------------------------------------------------------------------
 import Control.Monad (join)
 import Control.Applicative as A hiding (many)
 import Data.Attoparsec
@@ -14,12 +14,13 @@ import Data.ByteString.Char8 as C hiding (concat,intersperse,group)
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8)
 import Prelude hiding (take, takeWhile)
-import Network.Parser.RfcCommon hiding (ctext)
-import Network.Parser.Rfc2234
 import qualified Data.Map as M
 import Prelude hiding (id)
 import Data.List hiding (group)
-
+--------------------------------------------------------------------------------
+import Network.Parser.RfcCommon hiding (ctext)
+import Network.Parser.Rfc2234
+--------------------------------------------------------------------------------
 -- | * 3.2.1. Primitive Tokens
 no_ws_ctl_pred w = w == 32 || ctl_pred w
 no_ws_ctl = satisfy no_ws_ctl_pred

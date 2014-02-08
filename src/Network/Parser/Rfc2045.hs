@@ -4,7 +4,7 @@
 -- Format of Internet Message Bodies
 -- <http://www.ietf.org/rfc/rfc2045.txt>
 module Network.Parser.Rfc2045 where
-
+--------------------------------------------------------------------------------
 import Control.Monad (join)
 import Control.Applicative as A hiding (many)
 import Data.Attoparsec
@@ -14,11 +14,12 @@ import Data.ByteString.Char8 as C
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Word (Word8)
 import Prelude hiding (take, takeWhile)
+import qualified Data.Map as M
+--------------------------------------------------------------------------------
 import Network.Parser.RfcCommon hiding (text)
 import Network.Parser.Rfc2234
 import Network.Parser.Rfc2822 (msg_id, comment, text)
-import qualified Data.Map as M
-
+--------------------------------------------------------------------------------
 -- TODO: implement fields of rfc 822
 
 -- TODO: we don't support comments on header values "MIME-Version:
