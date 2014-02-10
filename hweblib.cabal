@@ -1,5 +1,5 @@
 Name:                hweblib
-Version:             0.5
+Version:             0.6
 Synopsis:            Haskell Web Library
 Description:
   The library includes attoparsec based incremental parsers for
