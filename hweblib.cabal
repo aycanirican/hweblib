@@ -15,7 +15,7 @@ Category:            Web
 Build-type:          Simple
 Cabal-version:       >= 1.10
 Tested-With:         GHC==7.6.2, GHC==7.4.2
-Extra-Source-Files:  README test/mime-wiki.txt test/benchmark-results.txt
+Extra-Source-Files:  README.md test/mime-wiki.txt test/benchmark-results.txt
 
 Library
   hs-source-dirs:    src
