@@ -7,7 +7,7 @@ module Network.Parser.Rfc2616 where
 import Control.Monad (liftM)
 import Control.Applicative hiding (many)
 import Data.Attoparsec
-import Data.Attoparsec.Char8 (stringCI)
+import Data.Attoparsec.Char8 (stringCI, decimal)
 import Data.ByteString as W hiding (concat)
 import Data.ByteString.Char8 as C hiding (concat)
 import Data.ByteString.Internal (c2w)
@@ -37,11 +37,10 @@ separators = satisfy separators_pred
 {-# INLINE separators #-}
 
 comment :: Parser [Word8]
-comment = do 
-  word8 40 
-  r <- concat <$> many' (quotedPair <|> ((:[]) <$> ctext))
-  word8 41
-  return r
+comment
+  = word8 40
+    *> (concat <$> many' (quotedPair <|> ((:[]) <$> ctext)))
+    <* word8 41
 
 -- parse (httpVersion) (W.pack "HTTP/12.15\n")
 httpVersion :: Parser HttpVersion
@@ -111,7 +110,7 @@ request :: Parser Request
 request = do
   (m, ru, v) <- requestLine 
   hdrs <- many' (header <* crlf)
-  crlf
+  _ <- crlf
 --  body <- option [] messageBody
   return Request
            { rqMethod  = m
@@ -121,3 +120,28 @@ request = do
            , rqBody    = W.empty -- W.pack body
            }
 
+reasonPhraseText :: Parser Word8
+reasonPhraseText = satisfy char_not_ctl
+  where char_not_ctl w = char_pred w && not (ctl_pred w)
+
+reasonPhrase :: Parser [Word8]
+reasonPhrase = many1 reasonPhraseText
+
+statusLine :: Parser (HttpVersion, Int, [Word8])
+statusLine = (,,) <$> httpVersion <* sp
+                  <*> decimal <* sp
+                  <*> reasonPhrase <* crlf
+
+
+response ::  Parser Response
+response = do
+  (ver, code, reason) <- statusLine
+  hdrs <- many' (header <* crlf)
+  _ <- crlf
+  msg <- option [] messageBody
+  return Response
+         { rpCode = code
+         , rpHeaders = hdrs
+         , rpVersion = ver
+         , rpMessage = W.pack msg
+         }

@@ -73,7 +73,7 @@ data Response =
   Response {
       rpCode    :: Int                        -- ^ Response Code
     , rpHeaders :: [(ByteString, ByteString)] -- ^ Response Headers as an alist
-    , rpVersion :: (Int,Int)                  -- ^ HTTP Version
+    , rpVersion :: HttpVersion                -- ^ HTTP Version
     , rpMessage :: ByteString                 -- ^ Response Message
   } deriving (Eq, Show)
 

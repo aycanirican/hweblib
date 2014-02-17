@@ -14,13 +14,9 @@ import Data.Attoparsec.Char8 as AC hiding (digit, char)
 import qualified Data.Attoparsec.ByteString as DAC
 import Data.ByteString as W
 import Data.ByteString.Char8 as C
-import Data.ByteString.Internal (c2w, w2c)
-import Data.Word (Word8, Word64)
-import Data.Char (digitToInt, isAsciiUpper, isAsciiLower)
 import Control.Monad (join)
+import Data.Word
 import Prelude hiding (take, takeWhile)
-import Data.Typeable (Typeable)
-import Data.Data (Data)
 --------------------------------------------------------------------------------
 import Network.Parser.Rfc2234
 --------------------------------------------------------------------------------
