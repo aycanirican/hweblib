@@ -53,21 +53,21 @@ data Method = GET
             | EXTENSIONMETHOD ByteString
               deriving (Eq, Show)
 
-data Request =
-  Request {
-      rqMethod  :: Method                     -- ^ Request Method
-    , rqUri     :: RequestUri                 -- ^ Request URI
-    , rqVersion :: HttpVersion                -- ^ HTTP Version as a tuple
-    , rqHeaders :: [(ByteString, ByteString)] -- ^ Request Headers as an alist
-    , rqBody    :: ByteString                 -- ^ Request Body
-    } deriving (Eq, Show)
+data Request
+  = Request { rqMethod  :: Method                     -- ^ Request Method
+            , rqUri     :: RequestUri                 -- ^ Request URI
+            , rqVersion :: HttpVersion                -- ^ HTTP Version as a tuple
+            , rqHeaders :: [(ByteString, ByteString)] -- ^ Request Headers as an alist
+            , rqBody    :: ByteString                 -- ^ Request Body
+            } deriving (Eq, Show)
 
-data RequestUri = Asterisk                  -- ^ like in OPTIONS * HTTP/1.1
-                | AbsoluteUri URI           -- ^ commonly used in proxy servers
-                | AbsolutePath ByteString   -- ^ like /asd.cgi
-                | RelativeRef URI           -- ^ with a query part like /asd.cgi?foo=bar
-                | Authority (Maybe URIAuth) -- ^ Just the authority part
-                deriving (Eq, Show)
+data RequestUri
+  = Asterisk                  -- ^ like in OPTIONS * HTTP/1.1
+  | AbsoluteUri URI           -- ^ commonly used in proxy servers
+  | AbsolutePath ByteString   -- ^ like /asd.cgi
+  | RelativeRef URI           -- ^ with a query part like /asd.cgi?foo=bar
+  | Authority (Maybe URIAuth) -- ^ Just the authority part
+    deriving (Eq, Show)
 
 data Response =
   Response {

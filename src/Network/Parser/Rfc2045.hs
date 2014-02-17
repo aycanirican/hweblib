@@ -1,24 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Multipurpose Internet Mail Extensions (MIME) Part One: 
+-- | Multipurpose Internet Mail Extensions (MIME) Part One:
 -- Format of Internet Message Bodies
 -- <http://www.ietf.org/rfc/rfc2045.txt>
 module Network.Parser.Rfc2045 where
 --------------------------------------------------------------------------------
-import Control.Monad (join)
-import Control.Applicative as A hiding (many)
-import Data.Attoparsec
+import           Control.Applicative              as A hiding (many)
+import           Control.Monad                    (join)
+import           Data.Attoparsec
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import Data.ByteString as W
-import Data.ByteString.Char8 as C
-import Data.ByteString.Internal (c2w, w2c)
-import Data.Word (Word8)
-import Prelude hiding (take, takeWhile)
-import qualified Data.Map as M
+import           Data.ByteString                  as W
+import           Data.ByteString.Char8            as C
+import           Data.ByteString.Internal         (c2w, w2c)
+import qualified Data.Map                         as M
+import           Data.Word                        (Word8)
+import           Prelude                          hiding (take, takeWhile)
 --------------------------------------------------------------------------------
-import Network.Parser.RfcCommon hiding (text)
-import Network.Parser.Rfc2234
-import Network.Parser.Rfc2822 (msg_id, comment, text)
+import           Network.Parser.Rfc2234
+import           Network.Parser.Rfc2822           (comment, msg_id, text)
+import           Network.Parser.RfcCommon         hiding (text)
 --------------------------------------------------------------------------------
 -- TODO: implement fields of rfc 822
 
@@ -64,15 +64,15 @@ ianaToken = A.empty
 -- Prelude.map Data.Char.ord "()<>@,;:\\\"/[]?="
 -- tspecialsSet ::[Word8]
 -- tspecialsSet = [40,41,60,62,64,44,59,58,92,34,47,91,93,63,61]
-tspecials_pred :: Word8 -> Bool
-tspecials_pred = inClass "()<>@,;:\\\"/[]?=" -- F.memberWord8 w (F.fromList tspecialsSet)
+tspecialsPred :: Word8 -> Bool
+tspecialsPred = inClass "()<>@,;:\\\"/[]?=" -- F.memberWord8 w (F.fromList tspecialsSet)
 tspecials :: Parser Word8
-tspecials = satisfy tspecials_pred
+tspecials = satisfy tspecialsPred
 
-token_pred :: Word8 -> Bool
-token_pred w = char_pred w && not (w == 32 || ctl_pred w || tspecials_pred w)
+tokenPred :: Word8 -> Bool
+tokenPred w = charPred w && not (w == 32 || ctlPred w || tspecialsPred w)
 token :: Parser [Word8]
-token = many1 $ satisfy token_pred
+token = many1 $ satisfy tokenPred
 
 attribute :: Parser [Word8]
 attribute = token
@@ -81,10 +81,10 @@ parameter :: Parser (ByteString, ByteString)
 parameter = res <$> (attribute <* word8 61) <*> value
     where res a v = (W.pack a, W.pack v)
 
-xToken_pred :: Word8 -> Bool
-xToken_pred w = token_pred w && (w /= 32)
+xTokenPred :: Word8 -> Bool
+xTokenPred w = tokenPred w && (w /= 32)
 xToken :: Parser ByteString
-xToken = AC.stringCI "x-" *> (W.pack <$> many1 (satisfy xToken_pred))
+xToken = AC.stringCI "x-" *> (W.pack <$> many1 (satisfy xTokenPred))
 
 value :: Parser [Word8]
 value = token <|> quotedString
@@ -105,7 +105,7 @@ mtype = AC.stringCI "multipart"
 subtype :: Parser ByteString
 subtype = W.pack <$> token
 
--- TODO: extensionToken = xToken <|> ietfToken 
+-- TODO: extensionToken = xToken <|> ietfToken
 extensionToken :: Parser ByteString
 extensionToken = xToken
 
@@ -122,20 +122,20 @@ encoding = ret <$> (AC.stringCI "content-transfer-encoding" *> colonsp *> mechan
     where ret m = Header EncodingH m M.empty
 
 mechanism :: Parser ByteString
-mechanism = AC.stringCI "7bit" 
+mechanism = AC.stringCI "7bit"
             <|> AC.stringCI "8bit"
-            <|> AC.stringCI "binary" 
-            <|> AC.stringCI "quoted-printable" 
-            <|> AC.stringCI "base64" 
+            <|> AC.stringCI "binary"
+            <|> AC.stringCI "quoted-printable"
+            <|> AC.stringCI "base64"
             <|> xToken <|> ietfToken
 
 -- * Quoted Printable
 
-safeChar_pred :: Word8 -> Bool
-safeChar_pred w = (w >= 33 && w <= 60) || (w >= 62 && w <= 126)
+safeCharPred :: Word8 -> Bool
+safeCharPred w = (w >= 33 && w <= 60) || (w >= 62 && w <= 126)
 
 safeChar :: Parser Word8
-safeChar = satisfy safeChar_pred
+safeChar = satisfy safeCharPred
 
 hexOctet :: Parser Word8
 hexOctet = ret <$> (word8 61 *> hexdig) <*> hexdig
@@ -168,7 +168,7 @@ qpLine = do
   return $ join a ++ b
 
 quotedPrintable :: Parser ByteString
-quotedPrintable = do 
+quotedPrintable = do
   a <- appcon <$> qpLine <*> many' (crlf *> qpLine)
   return $ W.pack a
 
@@ -210,9 +210,9 @@ data HeaderType
       deriving (Eq,Show,Ord)
 
 data Header
-    = Header 
-      { hType :: HeaderType
-      , hValue :: ByteString
+    = Header
+      { hType   :: HeaderType
+      , hValue  :: ByteString
       , hParams :: M.Map ByteString ByteString
       } deriving (Eq, Show)
 

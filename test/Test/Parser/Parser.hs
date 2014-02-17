@@ -1,18 +1,22 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE OverloadedStrings         #-}
 module Test.Parser.Parser where
 --------------------------------------------------------------------------------
-import Data.Attoparsec
-import qualified Data.Attoparsec.Char8 as AC
+import           Data.Attoparsec
+import           Data.ByteString       as W
 import qualified Data.ByteString.Char8 as C
-import Data.ByteString as W
-import Data.Word
-import Test.HUnit
+import           Data.Word             (Word8)
+import           Test.HUnit
 --------------------------------------------------------------------------------
+
 aP :: (Eq a) => Parser a -> ByteString -> Maybe a
-aP p i = case parse p i of
-           Done _ r -> return r
-           _        -> fail "failed"
+aP p' i = case parse p' i of
+            Done _ r -> return r
+            _        -> fail "failed"
 
 -- Utils
-ae t a b = assertEqual t a b
+ae :: (Eq a, Show a) => String -> a -> a -> Assertion
+ae = assertEqual
+
+p :: String -> Maybe [Word8]
 p = Just . W.unpack . C.pack

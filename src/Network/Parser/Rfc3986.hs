@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, TupleSections #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections     #-}
 
 -- | Uniform Resource Identifier (URI): Generic Syntax
 -- <http://www.ietf.org/rfc/rfc3986.txt>
@@ -7,21 +8,22 @@
 module Network.Parser.Rfc3986 where
 
 --------------------------------------------------------------------------------
-import Control.Applicative hiding (many)
-import Data.Attoparsec
-import qualified Data.Attoparsec.Char8 as DAC
-import Data.ByteString as W
-import Data.ByteString.Char8 as C
-import Data.ByteString.Internal (c2w, w2c)
-import Data.Word (Word8, Word64)
-import Data.Char (digitToInt, isAsciiUpper, isAsciiLower)
-import Data.List (concat)
-import Prelude hiding (take, takeWhile)
-import Data.Typeable (Typeable)
+import           Control.Applicative      hiding (many)
+import           Data.Attoparsec
+import qualified Data.Attoparsec.Char8    as DAC
+import           Data.ByteString          as W
+import           Data.ByteString.Char8    as C
+import           Data.ByteString.Internal (c2w, w2c)
+import           Data.Char                (digitToInt, isAsciiLower,
+                                           isAsciiUpper)
+import           Data.List                (concat)
+import           Data.Typeable            (Typeable)
+import           Data.Word                (Word64, Word8)
+import           Prelude                  hiding (take, takeWhile)
 --------------------------------------------------------------------------------
+import           Network.Parser.Rfc2234
 import qualified Network.Parser.RfcCommon as RC
-import Network.Parser.Rfc2234
-import Network.Types
+import           Network.Types
 --------------------------------------------------------------------------------
 
 -- Prelude.map ord "!$&'()*+,;="
@@ -45,9 +47,9 @@ unreserved = alpha <|> digit <|> satisfy (inClass "-._~")
 
 pctEncoded :: Parser Word8
 pctEncoded = cat <$> word8 37
-             <*> satisfy hexdig_pred
-             <*> satisfy hexdig_pred
-  where 
+             <*> satisfy hexdigPred
+             <*> satisfy hexdigPred
+  where
     cat _ b c = toTen b * 16 + toTen c
     toTen w | w >= 48 && w <= 57  =  fromIntegral (w - 48)
             | w >= 97 && w <= 102 =  fromIntegral (w - 87)
@@ -73,7 +75,7 @@ regName = many' (unreserved <|> pctEncoded <|> subDelims)
 decOctet :: Parser [Word8]
 decOctet = do
   x <- many' digit
-  if read (C.unpack . W.pack $ x) > 255 
+  if read (C.unpack . W.pack $ x) > 255
     then fail "error decOctet"
     else return x
 
@@ -110,7 +112,7 @@ scheme = (:) <$> alpha <*> many' (alpha <|> digit <|> satisfy (inClass "+-."))
 relativePart = do try (word8 47 *> word8 47)
                   uu <- option Nothing authority
                   pa <- pathAbempty
-                  return (uu,pa) 
+                  return (uu,pa)
           <|> ((Nothing,) <$> pathAbsolute)
           <|> ((Nothing,) <$> pathNoscheme)
           <|> pure (Nothing, [])

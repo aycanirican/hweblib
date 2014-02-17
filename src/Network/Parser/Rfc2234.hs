@@ -5,18 +5,18 @@
 
 module Network.Parser.Rfc2234 where
 --------------------------------------------------------------------------------
-import Control.Applicative hiding (many)
-import Data.Attoparsec
-import Data.Word (Word8)
+import           Control.Applicative hiding (many)
+import           Data.Attoparsec
+import           Data.Word           (Word8)
 --------------------------------------------------------------------------------
 --
 -- * Primitive Parsers (6.1 Core Rules)
 --
 
-vchar_pred, sp_pred, lf_pred, ht_pred
- , hexdig_pred, digit_pred, dquote_pred
- , ctl_pred, char_pred, upalpha_pred
- , loalpha_pred, alpha_pred, bit_pred
+vcharPred, spPred, lfPred, htPred
+ , hexdigPred, digitPred, dquotePred
+ , ctlPred, charPred, upalphaPred
+ , loalphaPred, alphaPred, bitPred
     :: Word8 -> Bool
 
 -- | Parse a Space or Horizontal Tab
@@ -24,13 +24,13 @@ wsp :: Parser Word8
 wsp = sp <|> ht
 {-# INLINE wsp #-}
 
-vchar_pred w = w >= 0x21 && w <= 0x7e
+vcharPred w = w >= 0x21 && w <= 0x7e
 -- | Parse a Visible Character
 vchar :: Parser Word8
-vchar = satisfy vchar_pred
+vchar = satisfy vcharPred
 {-# INLINE vchar #-}
 
-sp_pred = (== 32)
+spPred = (== 32)
 -- | Parse a Space
 sp :: Parser Word8
 sp = word8 32 <?> "space"
@@ -46,43 +46,43 @@ lwsp :: Parser [Word8]
 lwsp = many' (wsp <|> crlf *> wsp) <?> "lightweight space"
 {-# INLINE lwsp #-}
 
-lf_pred = (== 10)
+lfPred = (== 10)
 -- | Parse a LineFeed
 lf :: Parser Word8
 lf = word8 10 <?> "linefeed"
 {-# INLINE lf #-}
 
 
-ht_pred = (== 9)
+htPred = (== 9)
 -- | Parse a Horizontal Tab
 ht :: Parser Word8
 ht = word8 9 <?> "horizontal tab"
 {-# INLINE ht #-}
 
-hexdig_pred w = (w >= 65 && w <= 70) 
+hexdigPred w = (w >= 65 && w <= 70)
              || (w >= 97 && w <= 102)
              || (w >= 48 && w <= 57)
 -- | Parse a hex digit
 hexdig :: Parser Word8
-hexdig = satisfy hexdig_pred
+hexdig = satisfy hexdigPred
 {-# INLINE hexdig #-}
 
-digit_pred w = w >= 48 && w <= 57 
+digitPred w = w >= 48 && w <= 57
 -- | Parse a digit
 digit :: Parser Word8
-digit = satisfy digit_pred
+digit = satisfy digitPred
 {-# INLINE digit #-}
 
-dquote_pred = (== 34)
+dquotePred = (== 34)
 -- | Parse a double quote
 dquote :: Parser Word8
 dquote = word8 34 <?> "double-quote"
 {-# INLINE dquote #-}
 
-ctl_pred w = (w == 127) || (w >= 0) && (w < 32)
+ctlPred w = (w == 127) || (w >= 0) && (w < 32)
 -- | Parse an ascii control character
 ctl :: Parser Word8
-ctl = satisfy ctl_pred <?> "ascii control character"
+ctl = satisfy ctlPred <?> "ascii control character"
 {-# INLINE ctl #-}
 
 -- | Parse CRLF
@@ -95,34 +95,34 @@ cr :: Parser Word8
 cr = word8 13 <?> "carriage return"
 {-# INLINE cr #-}
 
-char_pred w = w >= 0 || w <= 127
+charPred w = w >= 0 || w <= 127
 -- | Parse a character
 char :: Parser Word8
-char = satisfy char_pred
+char = satisfy charPred
 {-# INLINE char #-}
 
-bit_pred w = w == 48 || w == 49
+bitPred w = w == 48 || w == 49
 -- | Parse a Bit
 bit :: Parser Word8
-bit = satisfy bit_pred
+bit = satisfy bitPred
 {-# INLINE bit #-}
 
-upalpha_pred w = w >= 65 && w <= 90
+upalphaPred w = w >= 65 && w <= 90
 -- | Parse an uppercase alpha
 upalpha :: Parser Word8
-upalpha = satisfy upalpha_pred
+upalpha = satisfy upalphaPred
 {-# INLINE upalpha #-}
 
-loalpha_pred w = w >= 97 && w <= 122
+loalphaPred w = w >= 97 && w <= 122
 -- | Parse a lowercase alpha
 loalpha :: Parser Word8
-loalpha = satisfy loalpha_pred
+loalpha = satisfy loalphaPred
 {-# INLINE loalpha #-}
 
-alpha_pred w = upalpha_pred w || loalpha_pred w
+alphaPred w = upalphaPred w || loalphaPred w
 -- | Parse an alpha
 alpha :: Parser Word8
-alpha = satisfy alpha_pred
+alpha = satisfy alphaPred
 {-# INLINE alpha #-}
 
 -- | Match a parser at least @N@ times.

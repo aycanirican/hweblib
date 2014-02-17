@@ -5,25 +5,27 @@
 
 module Network.Parser.Rfc2822 where
 --------------------------------------------------------------------------------
-import Control.Monad (join)
-import Control.Applicative as A hiding (many)
-import Data.Attoparsec
-import qualified Data.Attoparsec.Char8 as AC
-import Data.ByteString as W hiding (concat,intersperse, group)
-import Data.ByteString.Char8 as C hiding (concat,intersperse,group)
-import Data.ByteString.Internal (c2w, w2c)
-import Data.Word (Word8)
-import Prelude hiding (take, takeWhile)
-import qualified Data.Map as M
-import Prelude hiding (id)
-import Data.List hiding (group)
+import           Control.Applicative      as A hiding (many)
+import           Control.Monad            (join)
+import           Data.Attoparsec
+import qualified Data.Attoparsec.Char8    as AC
+import           Data.ByteString          as W hiding (concat, group,
+                                                intersperse)
+import           Data.ByteString.Char8    as C hiding (concat, group,
+                                                intersperse)
+import           Data.ByteString.Internal (c2w, w2c)
+import           Data.List                hiding (group)
+import qualified Data.Map                 as M
+import           Data.Word                (Word8)
+import           Prelude                  hiding (take, takeWhile)
+import           Prelude                  hiding (id)
 --------------------------------------------------------------------------------
-import Network.Parser.RfcCommon hiding (ctext)
-import Network.Parser.Rfc2234
+import           Network.Parser.Rfc2234
+import           Network.Parser.RfcCommon hiding (ctext)
 --------------------------------------------------------------------------------
 -- | * 3.2.1. Primitive Tokens
-no_ws_ctl_pred w = w == 32 || ctl_pred w
-no_ws_ctl = satisfy no_ws_ctl_pred
+no_ws_ctlPred w = w == 32 || ctlPred w
+no_ws_ctl = satisfy no_ws_ctlPred
 
 -- | Parse a text element and return corresponding Word8
 text = satisfy $ \w ->
@@ -37,12 +39,12 @@ text = satisfy $ \w ->
 -- specialsSet ::[Word8]
 -- specialsSet = [40,41,60,62,91,93,58,59,64,92,44,46,34]
 
-specials_pred :: Word8 -> Bool
-specials_pred = inClass "()<>[]:;@\\,.\"" -- F.memberWord8 w (F.fromList specialsSet)
+specialsPred :: Word8 -> Bool
+specialsPred = inClass "()<>[]:;@\\,.\"" -- F.memberWord8 w (F.fromList specialsSet)
 
 -- | Parse a special
 specials :: Parser Word8
-specials = satisfy specials_pred
+specials = satisfy specialsPred
 
 -- | * 3.2.3. Folding white space and comments
 
@@ -57,12 +59,12 @@ fws = return [32] <$> many1 (choice [wsps, crlf *> wsps])
 -- | Parse ctext
 ctext :: Parser Word8
 ctext = crlf <|> no_ws_ctl <|> satisfy rest
-    where 
+    where
       rest w = (w >= 33 && w <= 39)
                || (w >= 42 && w <= 91)
                || (w >= 93 && w <= 126)
 
--- | Parse a comment 
+-- | Parse a comment
 comment :: Parser [Word8]
 comment = do
   word8 40
@@ -79,8 +81,8 @@ comment = do
 cfws = concat <$> many1 (choice [fws, comment])
 
 -- | * 3.2.4. Atom
-atext_pred w = char_pred w && not (ctl_pred w || sp_pred w || specials_pred w)
-atext = satisfy atext_pred
+atextPred w = charPred w && not (ctlPred w || spPred w || specialsPred w)
+atext = satisfy atextPred
 
 atom :: Parser [Word8]
 atom = option [] cfws *> many1 atext <* option [] cfws
@@ -92,14 +94,14 @@ dot_atom :: Parser [Word8]
 dot_atom = option [] cfws *> dot_atom_text <* option [] cfws
 
 -- | * 3.2.5. Quoted strings
-qtext_pred :: Word8 -> Bool
-qtext_pred w = no_ws_ctl_pred w 
-               || w == 33 
+qtextPred :: Word8 -> Bool
+qtextPred w = no_ws_ctlPred w
+               || w == 33
                || (w >= 35 && w <= 91)
                || (w >= 93 && w <= 126)
 
 qtext :: Parser Word8
-qtext = satisfy qtext_pred
+qtext = satisfy qtextPred
 {-# INLINE qtext #-}
 
 qcontent = option [] (asList qtext) <|> quotedPair
@@ -151,7 +153,7 @@ angle_addr = do
 group :: Parser [NameAddress]
 group = do
   display_name
-  word8 58 
+  word8 58
   r <- option [] mailbox_list
   option [] cfws
   word8 59
@@ -180,8 +182,8 @@ dcontent = try (do r <- dtext
                    return [r])
            <|> quotedPair
 
-dtext_pred w = no_ws_ctl_pred w || (w>=33 && w<=90) || (w>=94 && w<= 126)
-dtext = satisfy dtext_pred
+dtextPred w = no_ws_ctlPred w || (w>=33 && w<=90) || (w>=94 && w<= 126)
+dtext = satisfy dtextPred
 
 -- | * 3.6.4. Identification fields
 
