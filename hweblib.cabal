@@ -20,7 +20,7 @@ Extra-Source-Files:  README.md test/mime-wiki.txt test/benchmark-results.txt
 Library
   hs-source-dirs:    src
   Default-language:  Haskell2010
-  ghc-options:       -O2 -Wall -fhpc -fwarn-tabs -funbox-strict-fields -threaded
+  ghc-options:       -Wall -fwarn-tabs -funbox-strict-fields
                      -fno-warn-unused-do-bind
   -- Modules exported by the library.
   Exposed-modules: 
@@ -50,7 +50,7 @@ Test-suite testsuite
   hs-source-dirs:    src test
   Main-is:           TestSuite.hs
   Default-language:  Haskell2010
-  ghc-options:       -O2 -Wall -fhpc -fwarn-tabs -funbox-strict-fields -threaded
+  ghc-options:       -O2 -Wall -fwarn-tabs -funbox-strict-fields -threaded
                      -fno-warn-unused-do-bind
   ghc-prof-options:  -prof -auto-all
 
