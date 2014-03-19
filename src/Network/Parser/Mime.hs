@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE CPP #-}
 
 -- http://www.ietf.org/rfc/rfc2045.txt
 -- http://www.ietf.org/rfc/rfc2046.txt
@@ -18,6 +19,12 @@ import Network.Parser.Rfc2045
 --------------------------------------------------------------------------------
 -- We're converting mime types to Haskell Types in order to get rid of
 -- string case conversion...
+
+#if MIN_VERSION_text(0,11,3)
+decodelatin1 = TE.decodeLatin1
+#else
+decodelatin1 = TE.decodeASCII
+#endif
 
 -- | * Utilities
 string2mimetype :: ByteString -> MimeType
@@ -43,7 +50,7 @@ string2mimetype s =
             _ -> MultiPart (Extension s)
       (t, s) -> Other t s
     where
-      paired s = let (a,b) = (T.break (== '/') . T.toLower . TE.decodeLatin1) s in
+      paired s = let (a,b) = (T.break (== '/') . T.toLower . decodelatin1) s in
                  (a, T.drop 1 b)
 
 -- Parse headers and map them to a MimeValue
@@ -53,8 +60,8 @@ parseMimeHeaders = do
   let mv = L.foldl f nullMimeValue eh
   return mv
   where
-    bs2t = M.fromList . Prelude.map (TE.decodeLatin1 *** TE.decodeLatin1) . M.toList
-    hVal = TE.decodeLatin1 . hValue
+    bs2t = M.fromList . Prelude.map (decodelatin1 *** decodelatin1) . M.toList
+    hVal = decodelatin1 . hValue
     f z x = 
         case hType x of
           IdH -> z { mvHeaders = M.insert IdH (hVal x) (mvHeaders z) }
