@@ -29,7 +29,7 @@ parseGetData = "GET /favicon.ico HTTP/1.1\r\n\
 tests :: Test
 tests = TestList $ fmap TestCase lst
 
-lst = [testOctet, testChar, testUpalpha, testLoalpha, testLws, testQuotedString, testRequestline, testRequestline2, testRequestline3]
+lst = [testOctet, testChar, testUpalpha, testLoalpha, testLws, testQuotedString, testRequest, testRequest2, testRequestline, testRequestline2, testRequestline3]
 -- Tests
 
 testOctet = ae "octet" (Just 48) (aP octet "01")
