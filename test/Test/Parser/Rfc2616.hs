@@ -29,7 +29,7 @@ parseGetData = "GET /favicon.ico HTTP/1.1\r\n\
 tests :: Test
 tests = TestList $ fmap TestCase lst
 
-lst = [testOctet, testChar, testUpalpha, testLoalpha, testLws, testQuotedString, testRequestline, testRequestline2]
+lst = [testOctet, testChar, testUpalpha, testLoalpha, testLws, testQuotedString, testRequestline, testRequestline2, testRequestline3]
 -- Tests
 
 testOctet = ae "octet" (Just 48) (aP octet "01")
@@ -69,6 +69,30 @@ testRequest = ae "request"
                                           , ("Accept-Encoding","gzip,deflate")
                                           , ("Accept-Charset","ISO-8859-1,utf-8;q=0.7,*;q=0.7")
                                           , ("Keep-Alive","300")
+                                          , ("Connection","keep-alive")]
+                                          , rqBody = ""})
+              (aP request parseGetData)
+parseGetData2 :: ByteString
+parseGetData2 = "GET /search?q=haskell HTTP/1.1\r\n\
+                \Host: www.google.co.jp\r\n\
+                \User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:29.0) Gecko/20100101 Firefox/29.0\r\n\
+                \Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8\r\n\
+                \Accept-Language: ja,en-us;q=0.7,en;q=0.3\r\n\
+                \Accept-Encoding: gzip, deflate\r\n\
+                \Cookie: PREF=ID=7ca99b92f2f9afe9:FF=0:TM=1400941989:LM=1400941989:S=w2rcVppuXeOj6pXi; NID=67=N3XLJvzIIHqfvn_LuNTgBmA59ni-8YNTZ-RFASwaaByYQ9q0wfljtVHijfzQIGVJQ8axRzvOoBI9idcimOPUVI4obXncxIUUVf17AgubzR8KFBQVlXb7n2S0LNV43EPV\r\n\
+                \Connection: keep-alive\r\n\
+                \\r\n"
+
+testRequest2 = ae "request"
+              (Just Request { rqMethod = GET
+                            , rqUri = AbsolutePath "/search"
+                            , rqVersion = http11
+                            , rqHeaders = [ ("Host","www.google.co.jp")
+                                          , ("User-Agent","Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:29.0) Gecko/20100101 Firefox/29.0")
+                                          , ("Accept","text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
+                                          , ("Accept-Language","ja,en-us;q=0.7,en;q=0.3")
+                                          , ("Accept-Encoding","gzip, deflate")
+                                          , ("Cookie", "PREF=ID=7ca99b92f2f9afe9:FF=0:TM=1400941989:LM=1400941989:S=w2rcVppuXeOj6pXi; NID=67=N3XLJvzIIHqfvn_LuNTgBmA59ni-8YNTZ-RFASwaaByYQ9q0wfljtVHijfzQIGVJQ8axRzvOoBI9idcimOPUVI4obXncxIUUVf17AgubzR8KFBQVlXb7n2S0LNV43EPV")
                                           , ("Connection","keep-alive")]
                                           , rqBody = ""})
               (aP request parseGetData)
