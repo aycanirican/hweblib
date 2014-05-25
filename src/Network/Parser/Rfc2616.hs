@@ -72,9 +72,9 @@ method = (GET         <$ stringCI "get")
 
 requestUri :: Parser RequestUri
 requestUri = try (Asterisk <$ word8 42)
+             <|> RelativeRef <$> R3986.relativeRef
              <|> AbsoluteUri <$> R3986.absoluteUri
              <|> (AbsolutePath . W.pack) <$> R3986.pathAbsolute
-             <|> RelativeRef <$> R3986.relativeRef
              <|> Authority <$> R3986.authority
 
 -- parse requestLine (C.pack "GET /my.cgi?foo=bar&john=doe HTTP/1.1\n")
