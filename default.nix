@@ -1,26 +1,15 @@
-{ hs ? (import <nixpkgs> { }).haskellPackages }:
+{ cabal, attoparsec, HUnit, mtl, text, transformers }:
 
-let
-    inherit (hs) cabal;
-in cabal.mkDerivation (self : rec {
-    pname = "hweblib";
-    version = "0.6.3";
-    isExecutable = false;
-    isLibrary = true;
-    preConfigure = ''rm -rf dist'';
-    src = ./.;
-
-    buildDepends = [
-        hs.attoparsec
-        hs.mtl
-        hs.text
-        hs.transformers
-    ];
-
-    testDepends = [
-        hs.attoparsec
-        hs.HUnit
-        hs.mtl
-        hs.transformers
-    ];
+cabal.mkDerivation (self: {
+  pname = "hweblib";
+  version = "0.6.3";
+  sha256 = "03dmx5irlsyb3b9zg2r6nz947sslizkn0nlk65ldb5n4m8my33hy";
+  buildDepends = [ attoparsec mtl text transformers ];
+  testDepends = [ attoparsec HUnit mtl transformers ];
+  meta = {
+    homepage = "http://github.com/aycanirican/hweblib";
+    description = "Haskell Web Library";
+    license = self.stdenv.lib.licenses.bsd3;
+    platforms = self.ghc.meta.platforms;
+  };
 })
