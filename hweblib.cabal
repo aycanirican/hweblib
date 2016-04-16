@@ -14,7 +14,7 @@ Maintainer:          iricanaycan@gmail.com
 Category:            Web
 Build-type:          Simple
 Cabal-version:       >= 1.10
-Tested-With:         GHC==7.6.2, GHC==7.4.2
+Tested-With:         GHC >= 7.8
 Extra-Source-Files:  README.md test/mime-wiki.txt test/benchmark-results.txt
 
 Library
