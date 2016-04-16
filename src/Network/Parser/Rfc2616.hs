@@ -14,7 +14,7 @@
 
 module Network.Parser.Rfc2616 where
 --------------------------------------------------------------------------------
-import           Control.Applicative              ((<|>))
+import           Control.Applicative
 import           Control.Monad                    (liftM)
 import           Data.Attoparsec.ByteString
 import           Data.Attoparsec.ByteString.Char8 (decimal, stringCI, take)

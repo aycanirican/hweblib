@@ -17,7 +17,7 @@
 module Network.Parser.Rfc3986 where
 
 --------------------------------------------------------------------------------
-import           Control.Applicative              hiding (many)
+import           Control.Applicative
 import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as DAC
 import           Data.ByteString

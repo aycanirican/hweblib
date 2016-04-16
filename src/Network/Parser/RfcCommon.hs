@@ -14,7 +14,7 @@
 
 module Network.Parser.RfcCommon where
 --------------------------------------------------------------------------------
-import           Control.Applicative        ((<|>))
+import           Control.Applicative
 import           Control.Monad              (join)
 import           Data.Attoparsec.ByteString as BS
 import           Data.ByteString            as W

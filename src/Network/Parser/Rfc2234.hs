@@ -15,7 +15,7 @@
 
 module Network.Parser.Rfc2234 where
 --------------------------------------------------------------------------------
-import           Control.Applicative        hiding (many)
+import           Control.Applicative
 import           Data.Attoparsec.ByteString
 import           Data.Word                  (Word8)
 --------------------------------------------------------------------------------

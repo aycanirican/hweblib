@@ -15,7 +15,7 @@
 
 module Network.Parser.Rfc2045 where
 --------------------------------------------------------------------------------
-import           Control.Applicative              (empty, (<|>))
+import           Control.Applicative
 import           Control.Monad                    (join)
 import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
