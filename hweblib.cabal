@@ -44,6 +44,7 @@ Library
     , transformers
     , text
     , attoparsec
+    , time
 
 Test-suite testsuite
   Type:              exitcode-stdio-1.0
@@ -79,6 +80,7 @@ Test-suite testsuite
     , transformers
     , attoparsec
     , HUnit
+    , time
 
 benchmark benchmark
   Type:             exitcode-stdio-1.0

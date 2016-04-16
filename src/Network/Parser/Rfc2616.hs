@@ -1,21 +1,30 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Hypertext Transfer Protocol -- HTTP/1.1
+-- |
+-- Module      :  Network.Parser.2616
+-- Copyright   :  Aycan iRiCAN 2010-2015
+-- License     :  BSD3
+--
+-- Maintainer  :  iricanaycan@gmail.com
+-- Stability   :  experimental
+-- Portability :  unknown
+--
+-- Hypertext Transfer Protocol -- HTTP/1.1
 -- <http://www.ietf.org/rfc/rfc2616.txt>
+
 module Network.Parser.Rfc2616 where
 --------------------------------------------------------------------------------
-import           Control.Applicative      hiding (many)
-import           Control.Monad            (liftM)
-import           Data.Attoparsec
-import           Data.Attoparsec.Char8    (decimal, stringCI, take)
-import           Data.ByteString          as W hiding (concat, take)
-import           Data.ByteString.Char8    as C hiding (concat, take)
-import           Data.ByteString.Internal (c2w)
-import           Data.Word                (Word8 ())
-import           Prelude                  hiding (take, takeWhile)
+import           Control.Applicative              ((<|>))
+import           Control.Monad                    (liftM)
+import           Data.Attoparsec.ByteString
+import           Data.Attoparsec.ByteString.Char8 (decimal, stringCI, take)
+import           Data.ByteString                  as W hiding (concat, take)
+import           Data.ByteString.Char8            as C hiding (concat, take)
+import           Data.ByteString.Internal         (c2w)
+import           Data.Word                        (Word8)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
-import           Network.Parser.Rfc3986   as R3986
+import           Network.Parser.Rfc3986           as R3986
 import           Network.Parser.RfcCommon
 import           Network.Types
 --------------------------------------------------------------------------------
@@ -28,7 +37,7 @@ tokenPred w = charPred w && not (ctlPred w || separatorsPred w)
 -- token = 1*<any CHAR except CTLs or separators>
 token :: Parser [Word8]
 token = many1 $ satisfy tokenPred
-{-# INLINE token #-}
+{-# INLINABLE token #-}
 
 -- "()<>@,;:\\\"/[]?={} \t"
 -- separatorSet :: [Word8]
@@ -43,7 +52,7 @@ separatorsPred = inClass "()<>@,;:\\\"/[]?={} \t" -- memberWord8 w (fromList sep
 --                | "{" | "}" | SP | HT
 separators :: Parser Word8
 separators = satisfy separatorsPred
-{-# INLINE separators #-}
+{-# INLINABLE separators #-}
 
 comment :: Parser [Word8]
 comment

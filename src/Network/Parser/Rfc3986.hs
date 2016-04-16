@@ -1,28 +1,36 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
--- | Uniform Resource Identifier (URI): Generic Syntax
+-- |
+-- Module      :  Network.Parser.3986
+-- Copyright   :  Aycan iRiCAN 2010-2015
+-- License     :  BSD3
+--
+-- Maintainer  :  iricanaycan@gmail.com
+-- Stability   :  experimental
+-- Portability :  unknown
+--
+-- Uniform Resource Identifier (URI): Generic Syntax
 -- <http://www.ietf.org/rfc/rfc3986.txt>
 --  TODO: implement ipv6 and ipvfuture
 
 module Network.Parser.Rfc3986 where
 
 --------------------------------------------------------------------------------
-import           Control.Applicative      hiding (many)
-import           Data.Attoparsec
-import qualified Data.Attoparsec.Char8    as DAC
-import           Data.ByteString          as W
-import           Data.ByteString.Char8    as C
-import           Data.ByteString.Internal (c2w, w2c)
-import           Data.Char                (digitToInt, isAsciiLower,
-                                           isAsciiUpper)
-import           Data.List                (concat)
-import           Data.Typeable            (Typeable)
-import           Data.Word                (Word64, Word8)
-import           Prelude                  hiding (take, takeWhile)
+import           Control.Applicative              hiding (many)
+import           Data.Attoparsec.ByteString
+import qualified Data.Attoparsec.ByteString.Char8 as DAC
+import           Data.ByteString
+import qualified Data.ByteString.Char8            as C
+import           Data.Char                        (digitToInt, isAsciiLower,
+                                                   isAsciiUpper)
+import           Data.List                        (concat)
+import           Data.Typeable                    (Typeable)
+import           Data.Word                        (Word64, Word8)
+import           Prelude                          hiding (take, takeWhile)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
-import qualified Network.Parser.RfcCommon as RC
+import qualified Network.Parser.RfcCommon         as RC
 import           Network.Types
 --------------------------------------------------------------------------------
 
@@ -54,7 +62,7 @@ pctEncoded = cat <$> word8 37
     toTen w | w >= 48 && w <= 57  =  fromIntegral (w - 48)
             | w >= 97 && w <= 102 =  fromIntegral (w - 87)
             | otherwise           =  fromIntegral (w - 55)
-{-# INLINE pctEncoded #-}
+{-# INLINABLE pctEncoded #-}
 
 uchar extras = unreserved <|> pctEncoded <|> subDelims <|> satisfy (inClass extras)
 pchar = uchar ":@"
@@ -75,7 +83,7 @@ regName = many' (unreserved <|> pctEncoded <|> subDelims)
 decOctet :: Parser [Word8]
 decOctet = do
   x <- many' digit
-  if read (C.unpack . W.pack $ x) > 255
+  if read (C.unpack . pack $ x) > 255
     then fail "error decOctet"
     else return x
 
@@ -102,9 +110,9 @@ authority = do
   uh <- host
   up <- option [] (word8 58 *> port)
   return . Just $ URIAuth
-            { uriUserInfo = C.unpack $ W.pack uu
-            , uriRegName  = C.unpack $ W.pack uh
-            , uriPort     = C.unpack $ W.pack up
+            { uriUserInfo = C.unpack $ pack uu
+            , uriRegName  = C.unpack $ pack uh
+            , uriPort     = C.unpack $ pack up
             }
 
 scheme = (:) <$> alpha <*> many' (alpha <|> digit <|> satisfy (inClass "+-."))

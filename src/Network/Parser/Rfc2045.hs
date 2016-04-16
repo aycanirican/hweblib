@@ -1,20 +1,28 @@
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Multipurpose Internet Mail Extensions (MIME) Part One:
+-- |
+-- Module      :  Network.Parser.2045
+-- Copyright   :  Aycan iRiCAN 2010-2015
+-- License     :  BSD3
+--
+-- Maintainer  :  iricanaycan@gmail.com
+-- Stability   :  experimental
+-- Portability :  unknown
+--
+-- Multipurpose Internet Mail Extensions (MIME) Part One:
 -- Format of Internet Message Bodies
 -- <http://www.ietf.org/rfc/rfc2045.txt>
+
 module Network.Parser.Rfc2045 where
 --------------------------------------------------------------------------------
-import           Control.Applicative              as A hiding (many)
+import           Control.Applicative              (empty, (<|>))
 import           Control.Monad                    (join)
-import           Data.Attoparsec
+import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString                  as W
-import           Data.ByteString.Char8            as C
-import           Data.ByteString.Internal         (c2w, w2c)
-import qualified Data.Map                         as M
+import           Data.ByteString
+import qualified Data.ByteString.Char8            as C
+import           Data.Map.Strict                  as M
 import           Data.Word                        (Word8)
-import           Prelude                          hiding (take, takeWhile)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
 import           Network.Parser.Rfc2822           (comment, msg_id, text)
@@ -51,15 +59,15 @@ entityHeader = version <* crlf
 version :: Parser Header
 version = ret <$> (AC.stringCI "mime-version" *> colonsp *> AC.decimal) -- ':'
           <*> (word8 46 *> AC.decimal) -- '.'
-    where ret a b = Header VersionH (W.pack [a+48,46,b+48]) M.empty
+    where ret a b = Header VersionH (pack [a+48,46,b+48]) M.empty
 
 -- * 5. Content-Type Header Field
 
 ietfToken :: Parser ByteString
-ietfToken = A.empty
+ietfToken = Control.Applicative.empty
 
 ianaToken :: Parser ByteString
-ianaToken = A.empty
+ianaToken = Control.Applicative.empty
 
 -- Prelude.map Data.Char.ord "()<>@,;:\\\"/[]?="
 -- tspecialsSet ::[Word8]
@@ -79,12 +87,12 @@ attribute = token
 
 parameter :: Parser (ByteString, ByteString)
 parameter = res <$> (attribute <* word8 61) <*> value
-    where res a v = (W.pack a, W.pack v)
+    where res a v = (pack a, pack v)
 
 xTokenPred :: Word8 -> Bool
 xTokenPred w = tokenPred w && (w /= 32)
 xToken :: Parser ByteString
-xToken = AC.stringCI "x-" *> (W.pack <$> many1 (satisfy xTokenPred))
+xToken = AC.stringCI "x-" *> (pack <$> many1 (satisfy xTokenPred))
 
 value :: Parser [Word8]
 value = token <|> quotedString
@@ -103,7 +111,7 @@ mtype = AC.stringCI "multipart"
 
 -- TODO: subtype = extensionToken <|> ianaToken
 subtype :: Parser ByteString
-subtype = W.pack <$> token
+subtype = pack <$> token
 
 -- TODO: extensionToken = xToken <|> ietfToken
 extensionToken :: Parser ByteString
@@ -170,18 +178,18 @@ qpLine = do
 quotedPrintable :: Parser ByteString
 quotedPrintable = do
   a <- appcon <$> qpLine <*> many' (crlf *> qpLine)
-  return $ W.pack a
+  return $ pack a
 
 -- * 7.  Content-ID Header Field
 contentId :: Parser Header
 contentId = ret <$> (AC.stringCI "content-id" *> colonsp *> msg_id)
-    where ret i = Header IdH (W.pack i) M.empty
+    where ret i = Header IdH (pack i) M.empty
 
 -- * 8.  Content-Description Header Field
 -- TODO: support 2047 encoding
 description :: Parser Header
 description = ret <$> (AC.stringCI "content-description" *> colonsp *> many' text)
-    where ret d = Header DescriptionH (W.pack d) M.empty
+    where ret d = Header DescriptionH (pack d) M.empty
 
 -- * 9. Additional MIME Header Fields
 -- TODO: support 822 header fields
@@ -189,7 +197,7 @@ mimeExtensionField :: Parser Header
 mimeExtensionField = do
   k <- AC.stringCI "content-" *> token
   v <- colonsp *> many' text
-  return $ Header (ExtensionH $ W.pack k)  (W.pack v) M.empty
+  return $ Header (ExtensionH $ pack k) (pack v) M.empty
 
 -- * Utilities
 colonsp :: Parser ()

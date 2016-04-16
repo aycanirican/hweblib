@@ -1,15 +1,17 @@
-{ cabal, attoparsec, HUnit, mtl, text, transformers }:
-
-cabal.mkDerivation (self: {
+{ mkDerivation, attoparsec, base, bytestring, containers, HUnit
+, mtl, stdenv, text, time, transformers
+}:
+mkDerivation {
   pname = "hweblib";
   version = "0.6.3";
-  sha256 = "03dmx5irlsyb3b9zg2r6nz947sslizkn0nlk65ldb5n4m8my33hy";
-  buildDepends = [ attoparsec mtl text transformers ];
-  testDepends = [ attoparsec HUnit mtl transformers ];
-  meta = {
-    homepage = "http://github.com/aycanirican/hweblib";
-    description = "Haskell Web Library";
-    license = self.stdenv.lib.licenses.bsd3;
-    platforms = self.ghc.meta.platforms;
-  };
-})
+  src = ./.;
+  libraryHaskellDepends = [
+    attoparsec base bytestring containers mtl text time transformers
+  ];
+  testHaskellDepends = [
+    attoparsec base bytestring containers HUnit mtl time transformers
+  ];
+  homepage = "http://github.com/aycanirican/hweblib";
+  description = "Haskell Web Library";
+  license = stdenv.lib.licenses.bsd3;
+}

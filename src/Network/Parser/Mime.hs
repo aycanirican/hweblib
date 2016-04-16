@@ -1,34 +1,37 @@
+{-# LANGUAGE CPP               #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE CPP #-}
 
+-- |
+-- Module      :  Network.Parser.Mime
+-- Copyright   :  Aycan iRiCAN 2010-2015
+-- License     :  BSD3
+--
+-- Maintainer  :  iricanaycan@gmail.com
+-- Stability   :  experimental
+-- Portability :  unknown
+--
 -- http://www.ietf.org/rfc/rfc2045.txt
 -- http://www.ietf.org/rfc/rfc2046.txt
 
 module Network.Parser.Mime where
 --------------------------------------------------------------------------------
-import Control.Arrow ((***))
-import Data.Attoparsec
-import Data.ByteString
-import Prelude hiding (take, takeWhile)
-import qualified Data.Map as M
-import qualified Data.List as L
-import qualified Data.Text as T
-import qualified Data.Text.Encoding as TE
+import           Control.Arrow              ((***))
+import           Data.Attoparsec.ByteString
+import           Data.ByteString
+import qualified Data.List                  as L
+import qualified Data.Map                   as M
+import qualified Data.Text                  as T
+import           Data.Text.Encoding
+import           Prelude                    hiding (take, takeWhile)
 --------------------------------------------------------------------------------
-import Network.Parser.Rfc2045
+import           Network.Parser.Rfc2045
 --------------------------------------------------------------------------------
 -- We're converting mime types to Haskell Types in order to get rid of
 -- string case conversion...
 
-#if MIN_VERSION_text(0,11,3)
-decodelatin1 = TE.decodeLatin1
-#else
-decodelatin1 = TE.decodeASCII
-#endif
-
 -- | * Utilities
 string2mimetype :: ByteString -> MimeType
-string2mimetype s = 
+string2mimetype s =
     case paired s of
       ("text", s) -> Text s
       ("image", s) -> Image s
@@ -36,7 +39,7 @@ string2mimetype s =
       ("video", s) -> Video s
       ("application", s) -> Application s
       ("message", s) -> Message s
-      ("multipart", s) -> 
+      ("multipart", s) ->
           case s of
             "alternative" -> MultiPart Alternative
             "byteranges" -> MultiPart Byteranges
@@ -50,7 +53,7 @@ string2mimetype s =
             _ -> MultiPart (Extension s)
       (t, s) -> Other t s
     where
-      paired s = let (a,b) = (T.break (== '/') . T.toLower . decodelatin1) s in
+      paired s = let (a,b) = (T.break (== '/') . T.toLower . decodeLatin1) s in
                  (a, T.drop 1 b)
 
 -- Parse headers and map them to a MimeValue
@@ -60,9 +63,9 @@ parseMimeHeaders = do
   let mv = L.foldl f nullMimeValue eh
   return mv
   where
-    bs2t = M.fromList . Prelude.map (decodelatin1 *** decodelatin1) . M.toList
-    hVal = decodelatin1 . hValue
-    f z x = 
+    bs2t = M.fromList . Prelude.map (decodeLatin1 *** decodeLatin1) . M.toList
+    hVal = decodeLatin1 . hValue
+    f z x =
         case hType x of
           IdH -> z { mvHeaders = M.insert IdH (hVal x) (mvHeaders z) }
           DescriptionH -> z { mvHeaders = M.insert DescriptionH (hVal x) (mvHeaders z) }
@@ -74,24 +77,24 @@ parseMimeHeaders = do
 -- | * Data Types
 -----------------
 -- Parts of the code:
--- Copyright : (c) 2006-2009, Galois, Inc. 
+-- Copyright : (c) 2006-2009, Galois, Inc.
 -- License   : BSD3
 
 -- | recursive at MimeContent, holding mime values
-data MimeValue 
+data MimeValue
     = MimeValue
-      { mvType :: Type
-      , mvDisp :: Maybe Disposition
+      { mvType    :: Type
+      , mvDisp    :: Maybe Disposition
       , mvContent :: MimeContent
       , mvHeaders :: M.Map HeaderType T.Text
       , mvIncType :: Bool
       } deriving (Eq, Show)
 
 nullMimeValue :: MimeValue
-nullMimeValue 
-    = MimeValue 
+nullMimeValue
+    = MimeValue
       { mvType = nullType
-      , mvDisp = Nothing 
+      , mvDisp = Nothing
       , mvContent = Multi []
       , mvHeaders = M.empty
       , mvIncType = True
@@ -99,7 +102,7 @@ nullMimeValue
 
 data Type
     = Type
-      { mimeType :: MimeType
+      { mimeType   :: MimeType
       , mimeParams :: M.Map T.Text T.Text
       } deriving (Eq, Show)
 
@@ -144,7 +147,7 @@ data MimeContent
 
 data Disposition
     = Disposition
-      { dispType :: DispType
+      { dispType   :: DispType
       , dispParams :: [DispParam]
       } deriving (Eq, Show)
 
