@@ -1,12 +1,13 @@
 {-# LANGUAGE DeriveDataTypeable #-}
-
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE OverloadedStrings  #-}
 module Network.Types
        ( -- * HTTP Types
          Method(..)
-       , HttpVersion(..)
+       , HTTPVersion(..)
        , http10
        , http11
-       , Header(..)
+       , Headers(..)
        , RequestUri(..)
        , Request(..)
        , Response(..)
@@ -20,26 +21,93 @@ module Network.Types
 --------------------------------------------------------------------------------
 import           Control.Exception     as Ex
 import           Data.ByteString.Char8 as C
+import           Data.Time
 import           Data.Typeable
+-- import           Generics.SOP
+import qualified GHC.Generics          as GHC
 --------------------------------------------------------------------------------
 -- | HTTP Version holds major and minor numbers.
-data HttpVersion =
-  HttpVersion { httpMajor :: Int
+data HTTPVersion =
+  HTTPVersion { httpMajor :: Int
               , httpMinor :: Int
-              } deriving (Eq, Show)
+              } deriving (Eq, Show, GHC.Generic)
 
 -- | HTTP 1.0
-http10 :: HttpVersion
-http10 = HttpVersion 1 0
+http10 :: HTTPVersion
+http10 = HTTPVersion 1 0
 
 -- | HTTP 1.1
-http11 :: HttpVersion
-http11 = HttpVersion 1 1
+http11 :: HTTPVersion
+http11 = HTTPVersion 1 1
 
--- data HttpMessage = Request | Response
+-- data HttpMessage
+--   = HttpMessage { mVersion        :: HTTPVersion
+--                 , mGeneralHeaders :: GeneralHeaders
+--                 , mUnknownHeaders :: Int -- TODO: fix this type
+--                 , mEntities       :: Int
+--                 } deriving (Eq, Show)
 
 -- | HTTP Headers
-data Header = GeneralHeader | RequestHeader | EntityHeader
+type Headers = [(ByteString, ByteString)]
+
+-- data Headers
+--   = Headers { entityHeaders  :: EntityHeaders
+--             , requestHeaders :: RequestHeaders
+--             , generalHeaders :: GeneralHeaders
+--             } deriving (Eq, Show)
+data EH = Allow ByteString
+        | Expires UTCTime
+        | ContentLength Int
+        | ContentLanguage ByteString
+          deriving (Eq, Show, GHC.Generic)
+
+data EntityHeaders
+  =  EntityHeaders { ehAllow           :: Maybe ByteString
+                   , ehContentEncoding :: Maybe ByteString
+                   , ehContentLanguage :: Maybe ByteString
+                   , ehContentLength   :: Maybe Int
+                   , ehContentLocation :: Maybe ByteString
+                   , ehContentMD5      :: Maybe ByteString
+                   , ehContentRange    :: Maybe ByteString
+                   , ehContentType     :: Maybe ByteString
+                   , ehExpires         :: Maybe UTCTime
+                   , ehLastModified    :: Maybe UTCTime
+                   } deriving (Eq, Show)
+
+data RequestHeaders
+  = RequestHeaders { rhAccept             :: Maybe ByteString
+                   , rhAcceptCharset      :: Maybe ByteString
+                   , rhAcceptEncoding     :: Maybe ByteString
+                   , rhAcceptLanguage     :: Maybe ByteString
+                   , rhAuthorization      :: Maybe ByteString
+                   , rhExpect             :: Maybe ByteString
+                   , rhFrom               :: Maybe ByteString
+                   , rhHost               :: Maybe ByteString
+                   , rhIfMatch            :: Maybe ByteString
+                   , rhIfModifiedSince    :: Maybe UTCTime
+                   , rhIfNoneMatch        :: Maybe ByteString
+                   , rhIfRange            :: Maybe ByteString
+                   , rhIfUnmodifiedSince  :: Maybe UTCTime
+                   , rhMaxForwards        :: Maybe ByteString
+                   , rhProxyAuthorization :: Maybe ByteString
+                   , rhRange              :: Maybe ByteString
+                   , rhReferrer           :: Maybe ByteString
+                   , rhTe                 :: Maybe ByteString
+                   , rhUserAgent          :: Maybe ByteString
+                   , rhCookie             :: Maybe ByteString
+                   } deriving (Eq, Show)
+
+data GeneralHeaders
+  = GeneralHeaders { ghCacheControl     :: Maybe ByteString
+                   , ghConnection       :: Maybe ByteString
+                   , ghDate             :: Maybe UTCTime
+                   , ghPragma           :: Maybe ByteString
+                   , ghTrailer          :: Maybe ByteString
+                   , ghTransferEncoding :: Maybe ByteString
+                   , ghUpgrade          :: Maybe ByteString
+                   , ghVia              :: Maybe ByteString
+                   , ghWarning          :: Maybe ByteString
+                   }  deriving (Eq, Show)
 
 -- | HTTP Methods
 data Method = GET
@@ -56,8 +124,8 @@ data Method = GET
 data Request
   = Request { rqMethod  :: Method                     -- ^ Request Method
             , rqUri     :: RequestUri                 -- ^ Request URI
-            , rqVersion :: HttpVersion                -- ^ HTTP Version as a tuple
-            , rqHeaders :: [(ByteString, ByteString)] -- ^ Request Headers as an alist
+            , rqVersion :: HTTPVersion                -- ^ HTTP Version as a tuple
+            , rqHeaders :: Headers                    -- ^ HTTP Message Headers
             , rqBody    :: ByteString                 -- ^ Request Body
             } deriving (Eq, Show)
 
@@ -72,33 +140,33 @@ data RequestUri
 data Response =
   Response {
       rpCode    :: Int                        -- ^ Response Code
-    , rpHeaders :: [(ByteString, ByteString)] -- ^ Response Headers as an alist
-    , rpVersion :: HttpVersion                -- ^ HTTP Version
+    , rpHeaders :: Headers                    -- ^ Response Headers
+    , rpVersion :: HTTPVersion                -- ^ HTTP Version
     , rpMessage :: ByteString                 -- ^ Response Message
   } deriving (Eq, Show)
 
 data URI = URI
-    { uriScheme    :: String        -- ^ Ex: http or https
+    { uriScheme    :: ByteString    -- ^ Ex: http or https
     , uriAuthority :: Maybe URIAuth -- ^ authority = [ userinfo "@" ] host [ ":" port ]
-    , uriPath      :: String        -- ^ Path is the part between the
+    , uriPath      :: ByteString    -- ^ Path is the part between the
                                     -- authority and the query
-    , uriQuery     :: String        -- ^ Query begins with '?'
-    , uriFragment  :: String        -- ^ Fragment begins with '#'
+    , uriQuery     :: ByteString    -- ^ Query begins with '?'
+    , uriFragment  :: ByteString    -- ^ Fragment begins with '#'
     } deriving (Eq, Show)
 
 data URIAuth = URIAuth
-    { uriUserInfo :: String  -- ^ username:password
-    , uriRegName  :: String  -- ^ registered name, ex: www.core.gen.tr
-    , uriPort     :: String  -- ^ Port as a string
+    { uriUserInfo :: ByteString  -- ^ username:password
+    , uriRegName  :: ByteString  -- ^ registered name, ex: www.core.gen.tr
+    , uriPort     :: ByteString  -- ^ Port as a string
     } deriving (Eq, Show)
 
 nullURI :: URI
 nullURI = URI
-    { uriScheme     = ""
+    { uriScheme     = mempty
     , uriAuthority  = Nothing
-    , uriPath       = ""
-    , uriQuery      = ""
-    , uriFragment   = ""
+    , uriPath       = mempty
+    , uriQuery      = mempty
+    , uriFragment   = mempty
     }
 
 -- | HTTP error.

@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Test.Parser.Rfc2045 where
 --------------------------------------------------------------------------------
-import Data.Attoparsec
-import Data.ByteString as W
-import qualified Data.ByteString.Char8 as C
-import Test.Parser.Parser
-import Test.HUnit
-import qualified Data.Map as M
+import           Data.Attoparsec.ByteString
+import           Data.ByteString            as W
+import qualified Data.ByteString.Char8      as C
+import qualified Data.Map                   as M
+import           Test.HUnit
+import           Test.Parser.Parser
 --------------------------------------------------------------------------------
-import Network.Parser.Rfc2045
-import Network.Parser.Rfc2234
-import Network.Parser.RfcCommon
+import           Network.Parser.Rfc2045
+import           Network.Parser.Rfc2234
+import           Network.Parser.RfcCommon
 --------------------------------------------------------------------------------
 tests = TestList $ fmap TestCase lst
 lst = [test_version, test_quotedPrintable]
@@ -26,7 +26,7 @@ test_quotedPrintable = ae "quotedPrintable"
                        (aP quotedPrintable qpString)
 
 --mimecontent1 = Content
---test_content = ae "content" 
+--test_content = ae "content"
 --               (Just $ Content ())
 --               (aP content "Content-type: text/plain; charset=us-ascii (Plain text)")
 

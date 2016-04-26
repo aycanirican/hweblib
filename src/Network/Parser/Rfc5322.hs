@@ -1,8 +1,7 @@
-{-# LANGUAGE ConstraintKinds   #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
--- Module      :  Network.Parser.Rfc2822
+-- Module      :  Network.Parser.Rfc5322
 -- Copyright   :  Aycan iRiCAN 2010-2015
 -- License     :  BSD3
 --
@@ -11,150 +10,169 @@
 -- Portability :  unknown
 --
 -- Internet Message Format
--- <http://www.ietf.org/rfc/rfc2822.txt>
+-- <http://www.ietf.org/rfc/rfc5322.txt>
 
-module Network.Parser.Rfc2822 where
+module Network.Parser.Rfc5322 where
 --------------------------------------------------------------------------------
 import           Control.Applicative
 import           Control.Monad                    (join)
 import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.Attoparsec.Combinator
-import           Data.ByteString                  as B (ByteString, concat,
-                                                        intercalate, pack,
-                                                        readFile)
+import           Data.ByteString                  (ByteString, cons, pack,
+                                                   singleton)
 import qualified Data.ByteString.Char8            as BSC
 import           Data.Char                        (digitToInt)
 import           Data.Fixed                       (Fixed (MkFixed))
-import           Data.List                        as L (concat, intercalate)
 import           Data.Maybe                       (catMaybes)
 import           Data.Monoid
 import           Data.Time
 import           Data.Word                        (Word8)
 import           Prelude                          hiding (id, take, takeWhile)
 --------------------------------------------------------------------------------
-import           Network.Parser.Rfc2234
-import           Network.Parser.RfcCommon         hiding (ctext)
+import           Network.Parser.Rfc5234
+import           Network.Parser.RfcCommon         hiding (ctext, text)
 --------------------------------------------------------------------------------
---  ** General Utils
+-- Data Types
+data Message
+  = Message { messageFields :: [Field]
+            , messageBody   :: Maybe ByteString
+            } deriving (Eq, Show)
 
--- | Used to generate arbitrary header parsers
-header :: ByteString -> Parser a -> Parser a
-header key p = AC.stringCI (key <> ":") *> p <* crlf
+data Field = TraceField Trace
+           | ResentDate UTCTime
+           | ResentFrom [NameAddress]
+           | ResentSender NameAddress
+           | ResentTo [NameAddress]
+           | ResentCc [NameAddress]
+           | ResentBcc [NameAddress]
+           | ResentMessageID ByteString
+           | Date UTCTime
+           | From [NameAddress]
+           | Sender NameAddress
+           | ReplyTo [NameAddress]
+           | To [NameAddress]
+           | Cc [NameAddress]
+           | Bcc [NameAddress]
+           | MessageID ByteString
+           | InReplyTo [ByteString]
+           | References [ByteString]
+           | Subject ByteString
+           | Comments ByteString
+           | Keywords [ByteString]
+           | OptionalField ByteString ByteString
+             deriving (Eq, Show)
 
--- ** 3.2.1. Primitive Tokens
-no_ws_ctlPred w
-  = (w >= 1 && w <= 8)
-    || (w == 11) || (w == 12)
-    || (w <= 14 && w >= 31)
-    || w == 127
-no_ws_ctl = satisfy no_ws_ctlPred
+data Received
+  = Received { receivedNameVals :: [ByteString]
+             , receivedDate     :: UTCTime
+             } deriving (Eq, Show)
 
--- | Parse a text element and return corresponding Word8
-text = satisfy $ \w ->
-       (w >= 1 && w<=9)
-       || w == 11
-       || w == 12
-       || (w >= 14 && w<=127)
+data Trace
+  = Trace { traceReturn   :: Maybe ByteString
+          , traceReceived :: [Received]
+          } deriving (Eq, Show)
 
--- Prelude.map Data.Char.ord "()<>[]:;@\\,.\""
+data NameAddress
+    = NameAddress
+      { naName :: Maybe ByteString
+      , naAddr :: ByteString
+      } deriving (Eq, Show)
 
--- specialsSet ::[Word8]
--- specialsSet = [40,41,60,62,91,93,58,59,64,92,44,46,34]
-specialsPred :: Word8 -> Bool
-specialsPred = inClass "()<>[]:;@\\,.\"" -- F.memberWord8 w (F.fromList specialsSet)
+-- 3.2.  Lexical Tokens
+-- | * 3.2.1.  Quoted characters
+quoted_pair :: Parser ByteString
+quoted_pair = (\a b -> pack $ a:b:[]) <$> word8 92 <*> (vchar <|> wsp)
 
--- | Parse a special
-specials :: Parser Word8
-specials = satisfy specialsPred
-
--- ** 3.2.3. Folding white space and comments
-
--- Parse Whitespaces
-wsps :: Parser [Word8]
-wsps = many1 wsp
-
+-- | * 3.2.2.  Folding White Space and Comments
 -- Parse Folding Whitespace
-fws :: Parser [Word8]
-fws = return [32] <$> many1 (choice [wsps, crlf *> wsps])
+fws :: Parser ByteString
+fws = do
+  option [] (many wsp *> (asList crlf))
+  many1 wsp
+  return " "
 
 -- Parse ctext
 ctext :: Parser Word8
-ctext = no_ws_ctl <|> satisfy rest
-    where
-      rest w = (w >= 33 && w <= 39)
-               || (w >= 42 && w <= 91)
-               || (w >= 93 && w <= 126)
+ctext = satisfy (\w ->
+                  w >= 33 && w <= 39
+                  || (w >= 42 && w <= 91)
+                  || (w >= 93 && w <= 126))
+
+ccontent :: Parser ByteString
+ccontent = (singleton <$> ctext) <|> quoted_pair <|> comment
 
 -- Parse a comment
 comment :: Parser ByteString
 comment = do
   word8 40
-  r1 <- many (option [] fws *> ccontent)
-  r2 <- pack <$> option [] fws
+  r1 <- many (option mempty fws *> ccontent)
+  r2 <- option mempty fws
   word8 41
-  return $ "(" <> B.concat r1 <> r2 <> ")"
-    where
-      ccontent :: Parser ByteString
-      ccontent = choice [(pack <$> many1 ctext), pack <$> quotedPair, comment]
+  return $ "(" <> BSC.concat r1 <> r2 <> ")"
 
-cfws = B.concat <$> many1 (choice [pack <$> fws, comment])
-ocfws = option mempty cfws
+cfws :: Parser ByteString
+cfws = BSC.concat <$> (many1 (option mempty fws *> comment) <* option mempty fws
+                      <|> asList fws)
 
--- | * 3.2.4. Atom
-atextPred w = charPred w && not (ctlPred w || spPred w || specialsPred w)
-atext = satisfy atextPred
+-- | * 3.2.3. Atom
+atext :: Parser Word8
+atext = alpha <|> digit <|> satisfy pred
+  where pred = inClass "!#$%&'*+-/=?^_`{|}~"
 
 atom :: Parser ByteString
-atom = pack <$> (ocfws *> many1 atext <* ocfws)
+atom = ocfws *> (pack <$> many1 atext) <* ocfws
 
 dot_atom_text :: Parser ByteString
-dot_atom_text = pack <$> L.intercalate [46] <$> sepBy (many1 atext) (word8 46)
+dot_atom_text = do
+  t1 <- many1 atext
+  t2 <- many ((:) <$> word8 46 <*> many1 atext)
+  return (pack t1 <> pack (join t2))
 
 dot_atom :: Parser ByteString
 dot_atom = ocfws *> dot_atom_text <* ocfws
 
--- | * 3.2.5. Quoted strings
-qtextPred :: Word8 -> Bool
-qtextPred w = no_ws_ctlPred w
-               || w == 33
-               || (w >= 35 && w <= 91)
-               || (w >= 93 && w <= 126)
+specials :: Parser ByteString
+specials = singleton <$> (satisfy pred <|> dquote)
+  where pred = inClass "()<>[]:;@\\,."
 
+-- | * 3.2.4.  Quoted Strings
 qtext :: Parser Word8
-qtext = satisfy qtextPred
+qtext = satisfy pred
+  where
+    pred w = (w == 33)
+             || (w >= 35 && w <= 91)
+             || (w >= 93 && w <= 126)
 {-# INLINABLE qtext #-}
 
 qcontent :: Parser ByteString
-qcontent = option mempty (pack <$> asList qtext) <|> (pack <$> quotedPair)
+qcontent = pack <$> (asList qtext <|> quotedPair)
 
+-- >>> parse quoted_string "\"asd is my foo\"\n\n"
+-- Done "\n\n" "\"asd is my foo\""
 quoted_string :: Parser ByteString
 quoted_string = do
   ocfws
   dquote
-  r1 <- B.concat <$> (many1 (option [] fws *> qcontent) <|> option [" "] ((:[]) . pack <$> fws))
+  r1 <- (many ((<>) <$> option mempty fws <*> qcontent) <* option mempty fws)
   dquote
   ocfws
-  return ("\"" <> r1 <> "\"")
-
--- | * 3.2.6. Miscellaneous tokens
+  return ("\"" <> BSC.concat r1 <> "\"")
+-- | * 3.2.5.  Miscellaneous Tokens
 word :: Parser ByteString
 word = atom <|> quoted_string
 
-phrase :: Parser ByteString
-phrase = B.concat <$> many1 word
+phrase :: Parser [ByteString]
+phrase = many1 word
 
-utext :: Parser Word8
-utext = no_ws_ctl <|> satisfy (\w -> w>=33 && w<=126)
+-- >>> parse unstructured "asda sdasd asd asd\n    asdasd asd\n\n"
+-- Done "\n\n" "asda sdasd asd asd asdasd asd"
+unstructured :: Parser ByteString
+unstructured = do
+  r1 <- many ((<>) <$> option mempty fws <*> (singleton <$> vchar))
+          <* many wsp
+  return (BSC.concat r1)
 
--- >>> parseOnly unstructured "  a b c \n"
--- Right " a b c "
-unstructured = pack <$> do
-  r1 <- option [] fws
-  r2 <- many ((:) <$> utext <*> option [] fws)
-  return (r1 ++ join r2)
-
-{- | * 3.3 Date and Time Specification
+{- * 3.3 Date and Time Specification
 
  date-time       =       [ day-of-week "," ] date FWS time [CFWS]
  day-of-week     =       ([FWS] day-name) / obs-day-of-week
@@ -187,17 +205,17 @@ twoDigitInt validator = do
 -- Done "\n\n" 2016-04-20 11:59:01 UTC
 -- >>> parse dateTime "Mon, 21 Sep 1980 10:01:02 +0230\n\n"
 -- Done "\n\n" 1980-09-21 07:31:02 UTC
-dateTime :: Parser UTCTime
-dateTime = do
+date_time :: Parser UTCTime
+date_time = do
   option 0 (dayOfWeek <* AC.char ',')
-  ((d,m,y), (tod,tz)) <- (,) <$> (date <* fws) <*> (time <* ocfws)
+  ((d,m,y), (tod,tz)) <- (,) <$> date <*> time <* ocfws
   let dt' = fromGregorianValid (toInteger y) m d
   case dt' of
     Just dt -> return . zonedTimeToUTC $ ZonedTime (LocalTime dt tod) tz
     Nothing -> fail "invalid day"
 
 dayOfWeek :: Parser Int
-dayOfWeek = option [] fws *> dayName
+dayOfWeek = option mempty fws *> dayName
 
 dayName :: Parser Int
 dayName
@@ -215,18 +233,15 @@ dayName
 date :: Parser (Int, Int, Int)
 date = (,,) <$> day <*> month <*> year
 
--- >>> parseOnly year "2015"
--- Right 2015
-year :: Parser Int
-year = sum . map (uncurry (*)) . zip [1000, 100, 10, 1] . fmap digitToInt <$> count 4 AC.digit
+-- >>> parseOnly day "21"
+-- Right 21
+-- >>> parseOnly day "41"
+-- Left "Failed reading: Invalid two digit integer"
+day :: Parser Int
+day = option mempty fws *> twoDigitInt (\x -> 0<=x && x <= 31) <* fws
 
--- >>> parseOnly month " Feb"
--- Right 2
 month :: Parser Int
-month = option [] fws *> monthName <* option [] fws
-
-monthName :: Parser Int
-monthName
+month
   =   AC.stringCI "Jan" *> pure 1
   <|> AC.stringCI "Feb" *> pure 2
   <|> AC.stringCI "Mar" *> pure 3
@@ -241,17 +256,16 @@ monthName
   <|> AC.stringCI "Dec" *> pure 12
   <?> "monthName"
 
--- >>> parseOnly day "21"
--- Right 21
--- >>> parseOnly day "41"
--- Left "Failed reading: Invalid two digit integer"
-day :: Parser Int
-day = option [] fws *> twoDigitInt (\x -> 0<=x && x <= 31)
+-- >>> parseOnly year "2015"
+-- Right 2015
+year :: Parser Int
+year =  conv <$> (fws *> count 4 AC.digit <* fws)
+  where conv = sum . map (uncurry (*)) . zip [1000, 100, 10, 1] . fmap digitToInt
 
 -- >>> parseOnly time "04:20:05 +0200"
 -- Right (04:20:05,+0200)
 time :: Parser (TimeOfDay, TimeZone)
-time = (,) <$> timeOfDay <* fws <*> zone
+time = (,) <$> timeOfDay <*> zone
 
 -- >>> parseOnly timeOfDay "04:20:01"
 -- Right 04:20:01
@@ -272,6 +286,7 @@ second = twoDigitInt (\x -> (0 <= x) && x <= 60)
 -- Right +0200
 zone :: Parser TimeZone
 zone = do
+  fws
   sign <- eitherP (AC.char '-') (AC.char '+')
   case sign of
     Left  l -> minutesToTimeZone . negate . minutes <$> fourDigit
@@ -283,39 +298,34 @@ zone = do
 
 -- | * 3.4. Address Specification
 address :: Parser [NameAddress]
-address = try (asList mailbox)
-          <|> group
+address = asList mailbox <|> group
 
 mailbox :: Parser NameAddress
-mailbox = try name_addr
-          <|> do a <- addr_spec
-                 return $ NameAddress Nothing a
+mailbox = name_addr <|> (NameAddress Nothing <$> addr_spec)
 
 name_addr :: Parser NameAddress
-name_addr = do n <- option mempty display_name
-               a <- angle_addr
-               return $ if "" ==  n
-                          then NameAddress Nothing a
-                          else NameAddress (Just n) a
+name_addr = NameAddress <$> option Nothing (Just <$> display_name)
+                        <*> angle_addr
 
 angle_addr :: Parser ByteString
-angle_addr
-  = ocfws *> word8 60 *> addr_spec <* word8 62 <* ocfws
+angle_addr = ocfws *> word8 60 *> addr_spec <* word8 62 <* ocfws
 
 group :: Parser [NameAddress]
-group
-  = display_name *> word8 58 *> option [] mailbox_list
-      <* ocfws <* word8 59 <* ocfws
+group = display_name *> word8 58 *> option [] group_list <* word8 59 <* ocfws
 
 display_name :: Parser ByteString
-display_name = phrase
+display_name = BSC.unwords <$> phrase
 
 mailbox_list :: Parser [NameAddress]
-mailbox_list = sepBy mailbox (word8 44)
+mailbox_list = (:) <$> mailbox <*> many (AC.char ',' *> mailbox)
 
 address_list :: Parser [NameAddress]
-address_list = Prelude.concat <$> sepBy address (word8 44)
+address_list = (++) <$> address <*> (join <$> many (AC.char ',' *> address))
 
+group_list :: Parser [NameAddress]
+group_list = mailbox_list <|> (cfws *> pure [])
+
+-- | 3.4.1.  Addr-Spec Specification
 addr_spec :: Parser ByteString
 addr_spec = ret <$> local_part <* AC.char '@' <*> domain
   where ret l r = l <> "@" <> r
@@ -323,51 +333,47 @@ addr_spec = ret <$> local_part <* AC.char '@' <*> domain
 local_part = dot_atom <|> quoted_string
 
 domain :: Parser ByteString
-domain = dot_atom <|> (pack <$> domain_literal)
+domain = dot_atom <|> domain_literal
 
-domain_literal :: Parser [Word8]
+domain_literal :: Parser ByteString
 domain_literal
-  =  ocfws *> word8 91
-  *> ((\xs -> [91] ++ (L.concat xs) ++ [92]) <$> many' (option [] fws *> dcontent))
-  <* word8 92
+  = do ocfws >> word8 91
+       res <- BSC.concat <$> many ((<>) <$> option mempty fws *> dcontent)
+       word8 92 >> ocfws
+       return ("[" <> res <> "]")
 
-dcontent = many1 dtext <|> quotedPair
+dcontent :: Parser ByteString
+dcontent = (pack <$> many1 dtext) <|> quoted_pair
 
-dtextPred w = no_ws_ctlPred w || (w>=33 && w<=90) || (w>=94 && w<= 126)
-dtext = satisfy dtextPred
+dtext :: Parser Word8
+dtext = satisfy pred
+  where pred w = (w>=33 && w<=90) || (w>=94 && w<= 126)
 
--- | * 3.5 Overall Message Syntax
-data Message
-  = Message { messageFields :: [Field]
-            , messageBody   :: ByteString
-            } deriving (Eq, Show)
-
-data Field = TraceField Trace
-           | ResentDate UTCTime
-           | ResentFrom [NameAddress]
-           | ResentSender NameAddress
-           | ResentTo [NameAddress]
-           | ResentCc [NameAddress]
-           | ResentBcc [NameAddress]
-           | ResentMessageID ByteString
-           | Date UTCTime
-           | From [NameAddress]
-           | Sender NameAddress
-           | ReplyTo [NameAddress]
-           | To [NameAddress]
-           | Cc [NameAddress]
-           | Bcc [NameAddress]
-           | MessageID ByteString
-           | InReplyTo [ByteString]
-           | References [ByteString]
-           | Subject ByteString
-           | Comments ByteString
-           | Keywords [ByteString]
-           | OptionalField ByteString ByteString
-             deriving (Eq, Show)
+-- 3.5.  Overall Message Syntax
 
 message :: Parser Message
-message = Message <$> fields <*> (option 0 crlf *> body)
+message = Message <$> fields <*> (option Nothing (Just <$> (crlf *> body)))
+
+-- (*(*998text CRLF) *998text)
+body :: Parser ByteString
+body = BSC.concat <$> (text998 `sepBy` crlf)
+
+text998 :: Parser ByteString
+text998 = textMax 998
+
+-- | TODO: optimize it...
+textMax :: Int -> Parser ByteString
+textMax 0 = return mempty
+textMax n = (cons <$> text <*> textMax (n-1)) <|> return mempty
+
+-- Characters excluding CR and LF
+text :: Parser Word8
+text = satisfy pred
+  where
+    pred w = (w >= 1 && w <= 9)
+             || w == 11
+             || w == 12
+             || (w >= 14 && w <= 127)
 
 fields :: Parser [Field]
 fields
@@ -395,12 +401,12 @@ fields
          <|> optional_field
          )
 
-body :: Parser ByteString
-body = BSC.pack <$> many AC.anyChar
+-- | Used to generate arbitrary header parsers
+header :: ByteString -> Parser a -> Parser a
+header key p = AC.stringCI (key <> ":") *> p <* crlf
 
---  ** 3.6 Field Definitions
 -- | 3.6.1. The origination date field
-orig_date = header "Date" (Date <$> dateTime)
+orig_date = header "Date" (Date <$> date_time)
 
 -- | 3.6.2. Originator fields
 from :: Parser Field
@@ -410,7 +416,7 @@ sender :: Parser Field
 sender = header "Sender" (Sender <$> mailbox)
 
 reply_to :: Parser Field
-reply_to = header "Reply To" (ReplyTo <$> mailbox_list)
+reply_to = header "Reply To" (ReplyTo <$> address_list)
 
 -- | 3.6.3. Destination address fields
 to :: Parser Field
@@ -420,7 +426,7 @@ cc :: Parser Field
 cc = header "Cc"  (Cc <$> address_list)
 
 bcc :: Parser Field
-bcc = header "Bcc" (Bcc <$> (address_list <|> (many cfws *> return [])))
+bcc = header "Bcc" (Bcc <$> option [] (address_list <|> (cfws *> return [])))
 
 -- | 3.6.4. Identification fields
 message_id :: Parser Field
@@ -439,22 +445,18 @@ msg_id = ocfws *> word8 60 *> mid <* word8 62 <* ocfws
     res l r = l <> "@" <> r
 
 id_left :: Parser ByteString
-id_left = dot_atom_text <|> pack <$> no_fold_quote
+id_left = dot_atom_text
 
 id_right :: Parser ByteString
-id_right = dot_atom_text <|> pack <$> no_fold_literal
+id_right = dot_atom_text <|> no_fold_literal
 
-no_fold_quote = do
-  l <- dquote
-  m <- L.concat <$> many' (option [] (asList qtext) <|> quotedPair)
-  r <- dquote
-  return $ [l] ++ m ++ [r]
-
+no_fold_literal :: Parser ByteString
 no_fold_literal = do
   l <- word8 91 -- '['
-  m <- L.concat <$> many' (option [] (asList dtext) <|> quotedPair)
+  m <- many dtext
   r <- word8 93 -- ']'
-  return $ [l] ++ m ++ [r]
+  return $ "[" <> pack m <> "]"
+
 -- | 3.6.5. Informational fields
 subject :: Parser Field
 subject  = header "Subject" (Subject <$> unstructured)
@@ -469,15 +471,15 @@ keywords = header "Keywords" (Keywords <$> kwrds)
     kwrds = do
       x <- phrase
       xs <- many (AC.char ',' *> phrase)
-      return $ x:xs
+      return $ x ++ join xs
 
 -- | 3.6.6. Resent fields
-resent_date   = header "Resent-Date"       (ResentDate      <$> dateTime)
+resent_date   = header "Resent-Date"       (ResentDate      <$> date_time)
 resent_from   = header "Resent-From"       (ResentFrom      <$> mailbox_list)
 resent_sender = header "Resent-Sender"     (ResentSender    <$> mailbox)
 resent_to     = header "Resent-To"         (ResentTo        <$> address_list)
 resent_cc     = header "Resent-Cc"         (ResentCc        <$> address_list)
-resent_bcc    = header "Resent-Bcc"        (ResentBcc       <$> (address_list <|> (many cfws *> return [])))
+resent_bcc    = header "Resent-Bcc"        (ResentBcc       <$> option [] (address_list <|> (cfws *> return [])))
 resent_msg_id = header "Resent-Message-ID" (ResentMessageID <$> msg_id)
 
 -- | 3.6.7. Trace fields
@@ -492,38 +494,12 @@ path :: Parser ByteString
 path = angle_addr <|> (ocfws >> AC.char '<' >> ocfws >> AC.char '>' >> ocfws >> pure "<>")
 
 received :: Parser Received
-received = header "Received" (Received <$> (name_val_list <* AC.char ';') <*> (dateTime <?> "date-time"))
+received = header "Received" (Received <$> (many received_token <* AC.char ';') <*> (date_time <?> "date-time"))
 
--- >>> parseOnly name_val_list "by 10.112.112.39 with SMTP id in7csp2918309lbb"
--- Right [("by","10.112.112.39"),("with","SMTP"),("id","in7csp2918309lbb")]
-name_val_list :: Parser [(ByteString, ByteString)]
-name_val_list = do
-  ocfws
-  n  <- option Nothing (Just <$> name_val_pair)
-  ns <- many (ocfws *> (Just <$> name_val_pair))
-  return . catMaybes $ n:ns
-
-name_val_pair :: Parser (ByteString, ByteString)
-name_val_pair = (,) <$> (item_name <* cfws) <*> item_value
-
-item_name :: Parser ByteString
-item_name = do
-  x  <- alpha
-  xs  <- many (alpha <|> digit <|> word8 45)
-  return . pack $ x:xs
-
--- >>> parseOnly item_value "10.112.112.39"
--- Right "10.112.112.39"
-item_value :: Parser ByteString
-item_value = (B.concat <$> many1 angle_addr)
-         <|> (addr_spec <?> "addr-spec")
-         <|> (domain    <?> "domain")
-         <|> (atom      <?> "atom")
-         <|> (msg_id    <?> "msg-id")
-
+received_token :: Parser ByteString
+received_token = word <|> angle_addr <|> addr_spec <|> domain
 
 -- | 3.6.8. Optional fields
--- TODO start here..
 optional_field :: Parser Field
 optional_field = OptionalField <$> (field_name <* word8 58) <*> (unstructured <* crlf)
 
@@ -533,18 +509,5 @@ field_name = pack <$> many1 ftext
 ftext :: Parser Word8
 ftext = satisfy $ \w -> (w >= 33 && w <= 57) || (w >= 59 && w <= 126)
 
--- * ADTs
-data Received
-  = Received { receivedNameVals :: [(ByteString, ByteString)]
-             , receivedDate     :: UTCTime
-             } deriving (Eq, Show)
-
-data Trace
-  = Trace { traceReturn   :: Maybe ByteString
-          , traceReceived :: [Received]
-          } deriving (Eq, Show)
-data NameAddress
-    = NameAddress
-      { naName :: Maybe ByteString
-      , naAddr :: ByteString
-      } deriving (Eq, Show)
+-- | Utils
+ocfws = option mempty cfws

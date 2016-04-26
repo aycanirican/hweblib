@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
--- Module      :  Network.Parser.Rfc2234
+-- Module      :  Network.Parser.Rfc5234
 -- Copyright   :  Aycan iRiCAN 2010-2015
 -- License     :  BSD3
 --
@@ -11,38 +11,38 @@
 --
 -- Augmented BNF for Syntax Specifications: ABNF
 --
--- <http://www.ietf.org/rfc/rfc2234.txt>
+-- <http://www.ietf.org/rfc/rfc5234.txt>
 
-module Network.Parser.Rfc2234 where
+module Network.Parser.Rfc5234 where
 --------------------------------------------------------------------------------
 import           Control.Applicative
 import           Data.Attoparsec.ByteString
 import           Data.Word                  (Word8)
 --------------------------------------------------------------------------------
 
--- | Primitive Parsers (6.1 Core Rules)
+-- | Appendix B.1  Core ABNF of ABNF
 
-vcharPred, spPred, lfPred, htPred
+vcharPred, spPred, lfPred, htabPred
  , hexdigPred, digitPred, dquotePred
- , ctlPred, charPred, upalphaPred
- , loalphaPred, alphaPred, bitPred
+ , ctlPred, charPred, alphaPred, bitPred
     :: Word8 -> Bool
 
 -- | Parse a Space or Horizontal Tab
 wsp :: Parser Word8
-wsp = sp <|> ht
+wsp = sp <|> htab
 {-# INLINABLE wsp #-}
 
 vcharPred w = w >= 0x21 && w <= 0x7e
 -- | Parse a Visible Character
 vchar :: Parser Word8
 vchar = satisfy vcharPred
+{-# INLINABLE vcharPred #-}
 {-# INLINABLE vchar #-}
 
-spPred = (== 32)
+spPred = (== 0x20)
 -- | Parse a Space
 sp :: Parser Word8
-sp = word8 32 <?> "space"
+sp = satisfy spPred <?> "space"
 {-# INLINABLE sp #-}
 
 -- | Parse an Octet
@@ -52,43 +52,46 @@ octet = anyWord8
 
 -- | Parse a Lightweight Space
 lwsp :: Parser [Word8]
-lwsp = many' (wsp <|> crlf *> wsp) <?> "lightweight space"
+lwsp = many (wsp <|> crlf *> wsp) <?> "lightweight space"
 {-# INLINABLE lwsp #-}
 
-lfPred = (== 10)
+lfPred = (== 0x0a)
 -- | Parse a LineFeed
 lf :: Parser Word8
-lf = word8 10 <?> "linefeed"
+lf = satisfy lfPred <?> "linefeed"
 {-# INLINABLE lf #-}
 
-
-htPred = (== 9)
+htabPred = (== 0x9)
 -- | Parse a Horizontal Tab
-ht :: Parser Word8
-ht = word8 9 <?> "horizontal tab"
-{-# INLINABLE ht #-}
+htab :: Parser Word8
+htab = satisfy htabPred <?> "horizontal tab"
+{-# INLINABLE htabPred #-}
+{-# INLINABLE htab #-}
 
-hexdigPred w = (w >= 65 && w <= 70)
-             || (w >= 97 && w <= 102)
-             || (w >= 48 && w <= 57)
+hexdigPred w
+  =    (w >= 65 && w <= 70) -- A..F
+    || (w >= 97 && w <= 102) -- a..f
+    || (w >= 48 && w <= 57) -- 0..9
 -- | Parse a hex digit
 hexdig :: Parser Word8
 hexdig = satisfy hexdigPred
 {-# INLINABLE hexdig #-}
 
-digitPred w = w >= 48 && w <= 57
+dquotePred = (== 0x22)
+-- | Parse a double quote
+dquote :: Parser Word8
+dquote = satisfy dquotePred <?> "double-quote"
+{-# INLINABLE dquotePred #-}
+{-# INLINABLE dquote #-}
+
+digitPred w = w >= 0x30 && w <= 0x39
 -- | Parse a digit
 digit :: Parser Word8
 digit = satisfy digitPred
+{-# INLINABLE digitPred #-}
 {-# INLINABLE digit #-}
 
-dquotePred = (== 34)
--- | Parse a double quote
-dquote :: Parser Word8
-dquote = word8 34 <?> "double-quote"
-{-# INLINABLE dquote #-}
-
-ctlPred w = (w == 127) || (w >= 0) && (w < 32)
+ctlPred w = (w == 0x7f) || (w >= 0) && (w < 0x1f)
 -- | Parse an ascii control character
 ctl :: Parser Word8
 ctl = satisfy ctlPred <?> "ascii control character"
@@ -100,11 +103,12 @@ crlf = return 10 <$> (try (cr *> lf) <|> lf)
 {-# INLINABLE crlf #-}
 
 -- | Parse CR
+crPred = (== 0x0d)
 cr :: Parser Word8
-cr = word8 13 <?> "carriage return"
+cr = satisfy crPred <?> "carriage return"
 {-# INLINABLE cr #-}
 
-charPred w = w >= 0 || w <= 127
+charPred w = w >= 0 || w <= 0x7f
 -- | Parse a character
 char :: Parser Word8
 char = satisfy charPred
@@ -116,19 +120,7 @@ bit :: Parser Word8
 bit = satisfy bitPred
 {-# INLINABLE bit #-}
 
-upalphaPred w = w >= 65 && w <= 90
--- | Parse an uppercase alpha
-upalpha :: Parser Word8
-upalpha = satisfy upalphaPred
-{-# INLINABLE upalpha #-}
-
-loalphaPred w = w >= 97 && w <= 122
--- | Parse a lowercase alpha
-loalpha :: Parser Word8
-loalpha = satisfy loalphaPred
-{-# INLINABLE loalpha #-}
-
-alphaPred w = upalphaPred w || loalphaPred w
+alphaPred w = (w >= 0x41 && w <= 0x5a) || (w >= 0x61 && w <= 0x7a)
 -- | Parse an alpha
 alpha :: Parser Word8
 alpha = satisfy alphaPred
@@ -138,7 +130,7 @@ alpha = satisfy alphaPred
 manyN :: Int -> Parser a -> Parser [a]
 manyN n p
     | n <= 0    = return []
-    | otherwise = (++) <$> count n p <*> many p
+    | otherwise = (++) <$> count n p <*> many' p
 {-# INLINABLE manyN #-}
 
 -- | Match a parser at least @N@ times, but no more than @M@ times.

@@ -21,7 +21,8 @@ import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString
 import qualified Data.ByteString.Char8            as C
-import           Data.Map.Strict                  as M
+import           Data.Map.Strict                  as M hiding (singleton)
+import           Data.Monoid
 import           Data.Word                        (Word8)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
@@ -47,12 +48,12 @@ entityHeaders :: Parser [Header]
 entityHeaders = many1 entityHeader
 
 entityHeader :: Parser Header
-entityHeader = version <* crlf
-               <|> content <* crlf
-               <|> encoding <* crlf
-               <|> description <* crlf
-               <|> contentId <* crlf
-               <|> mimeExtensionField <* crlf
+entityHeader  =   version     <* crlf
+              <|> content     <* crlf
+              <|> encoding    <* crlf
+              <|> description <* crlf
+              <|> contentId   <* crlf
+              <|> mimeExtensionField <* crlf
 
 -- * 4.  MIME-Version Header Field
 
@@ -85,17 +86,18 @@ token = many1 $ satisfy tokenPred
 attribute :: Parser [Word8]
 attribute = token
 
+-- >>> parseOnly
 parameter :: Parser (ByteString, ByteString)
 parameter = res <$> (attribute <* word8 61) <*> value
-    where res a v = (pack a, pack v)
+    where res a v = (pack a, v)
 
 xTokenPred :: Word8 -> Bool
 xTokenPred w = tokenPred w && (w /= 32)
 xToken :: Parser ByteString
 xToken = AC.stringCI "x-" *> (pack <$> many1 (satisfy xTokenPred))
 
-value :: Parser [Word8]
-value = token <|> quotedString
+value :: Parser ByteString
+value = (pack <$> token) <|> quotedString
 
 -- discrete and composite types are a little bit different from BNF
 -- definitions in order to keep code flow clean.
@@ -118,10 +120,10 @@ extensionToken :: Parser ByteString
 extensionToken = xToken
 
 content :: Parser Header
-content = res <$> (AC.stringCI "content-type" *> colonsp *> mtype)
-          <*> (word8 47 *> subtype)
-          <*> many' (semicolonsp *> parameter)
-    where res a b ps = Header ContentH (C.concat [a, "/", b]) (M.fromList ps)
+content
+  = do ty <- (<>) <$> (AC.stringCI "content-type" *> colonsp *> mtype) <* word8 47 <*> subtype
+       ps <-  many (semicolonsp *> parameter)
+       return $ Header ContentH ty (M.fromList ps)
 
 -- * 6. Content-Transfer-Encoding Header Type
 
@@ -151,18 +153,20 @@ hexOctet = ret <$> (word8 61 *> hexdig) <*> hexdig
           toTen w | w >= 48 && w <= 57  =  fromIntegral (w - 48)
                   | w >= 97 && w <= 102 =  fromIntegral (w - 87)
                   | otherwise           =  fromIntegral (w - 55)
-
-transportPadding :: Parser [Word8]
-transportPadding = option [32] lwsp
+-- >>> let message = "aaaa    \nbbbb"
+-- >>> parse (many (AC.char 'a') <* transportPadding) message
+-- Done "\nbbbb" "aaaa"
+transportPadding :: Parser ()
+transportPadding = lwsp >> return ()
 
 ptext :: Parser Word8
 ptext = hexOctet <|> safeChar
 
 qpSection :: Parser [Word8]
-qpSection = many' (ptext <|> sp <|> ht)
+qpSection = many (ptext <|> sp <|> ht)
 
 qpSegment :: Parser [Word8]
-qpSegment = ret <$> qpSection <*> many' (sp <|> ht) <*> word8 61
+qpSegment = ret <$> qpSection <*> many (sp <|> ht) <*> word8 61
     where ret a [] _ = a
           ret a _  _ = a ++ [32]
 
@@ -171,24 +175,24 @@ qpPart = qpSection
 
 qpLine :: Parser [Word8]
 qpLine = do
-  a <- many' $ (++) <$> qpSegment <*> (transportPadding <* crlf)
-  b <- (++) <$> qpPart <*> transportPadding
+  a <- many $ (++) <$> qpSegment <*> (transportPadding *> crlf >>= return . (:[]))
+  b <- qpPart <* transportPadding
   return $ join a ++ b
 
 quotedPrintable :: Parser ByteString
 quotedPrintable = do
-  a <- appcon <$> qpLine <*> many' (crlf *> qpLine)
+  a <- appcon <$> qpLine <*> many (crlf *> qpLine)
   return $ pack a
 
 -- * 7.  Content-ID Header Field
 contentId :: Parser Header
 contentId = ret <$> (AC.stringCI "content-id" *> colonsp *> msg_id)
-    where ret i = Header IdH (pack i) M.empty
+    where ret i = Header IdH i M.empty
 
 -- * 8.  Content-Description Header Field
 -- TODO: support 2047 encoding
 description :: Parser Header
-description = ret <$> (AC.stringCI "content-description" *> colonsp *> many' text)
+description = ret <$> (AC.stringCI "content-description" *> colonsp *> many text)
     where ret d = Header DescriptionH (pack d) M.empty
 
 -- * 9. Additional MIME Header Fields
@@ -196,7 +200,7 @@ description = ret <$> (AC.stringCI "content-description" *> colonsp *> many' tex
 mimeExtensionField :: Parser Header
 mimeExtensionField = do
   k <- AC.stringCI "content-" *> token
-  v <- colonsp *> many' text
+  v <- colonsp *> many text
   return $ Header (ExtensionH $ pack k) (pack v) M.empty
 
 -- * Utilities

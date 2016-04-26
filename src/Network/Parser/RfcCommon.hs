@@ -17,13 +17,12 @@ module Network.Parser.RfcCommon where
 import           Control.Applicative
 import           Control.Monad              (join)
 import           Data.Attoparsec.ByteString as BS
-import           Data.ByteString            as W
-import           Data.ByteString.Char8      as C
+import           Data.ByteString
+import qualified Data.ByteString.Char8      as C
 import           Data.Word
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
 --------------------------------------------------------------------------------
-
 -- | Common Parsers
 ----
 
@@ -34,7 +33,7 @@ hex = many1 hexdig
 
 -- | Parse lws and return space
 lws :: Parser Word8
-lws = (try (crlf *> s) <|> s) *> return 32 <?> "lightweight space"
+lws = ((crlf *> s) <|> s) *> return 32 <?> "lightweight space"
   where s = many1 (sp <|> ht)
 {-# INLINABLE lws #-}
 
@@ -67,14 +66,16 @@ quotedPair = ret <$> word8 92 <*> char
 {-# INLINABLE quotedPair #-}
 
 -- | Parse quoted string
-quotedString :: Parser [Word8]
+-- >>> parseOnly quotedString "\"asd\""
+-- Right "asd"
+quotedString :: Parser ByteString
 quotedString = do
   r <- word8 34 *> manyTill (do
                              a <- option [] quotedPair
                              b <- qdtext
-                             return $ a ++ [b])
+                             return $ a++b:[])
                             (word8 34)
-  return . join $ r
+  return . pack . join $ r
 {-# INLINABLE quotedString #-}
 
 -- | Parse a character but not a control character.
@@ -94,7 +95,7 @@ appcon = (. join) . (++)
 word8l w = (:[]) <$> word8 w
 
 -- | Convert a ByteString Word to ByteString Char
-toRepr = C.unpack . W.pack
+toRepr = C.unpack . pack
 
 asList :: Parser a -> Parser [a]
 asList p = (:[]) <$> p

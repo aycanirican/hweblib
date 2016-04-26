@@ -2,10 +2,10 @@
 {-# LANGUAGE OverloadedStrings         #-}
 module Test.Parser.Parser where
 --------------------------------------------------------------------------------
-import           Data.Attoparsec
-import           Data.ByteString       as W
-import qualified Data.ByteString.Char8 as C
-import           Data.Word             (Word8)
+import           Data.Attoparsec.ByteString
+import           Data.ByteString            as W
+import qualified Data.ByteString.Char8      as C
+import           Data.Word                  (Word8)
 import           Test.HUnit
 --------------------------------------------------------------------------------
 
@@ -17,6 +17,3 @@ aP p' i = case parse p' i of
 -- Utils
 ae :: (Eq a, Show a) => String -> a -> a -> Assertion
 ae = assertEqual
-
-p :: String -> Maybe [Word8]
-p = Just . W.unpack . C.pack

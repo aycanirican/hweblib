@@ -22,6 +22,7 @@ import qualified Data.List                  as L
 import qualified Data.Map                   as M
 import qualified Data.Text                  as T
 import           Data.Text.Encoding
+import           Data.Time
 import           Prelude                    hiding (take, takeWhile)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2045
@@ -147,8 +148,8 @@ data MimeContent
 
 data Disposition
     = Disposition
-      { dispType   :: DispType
-      , dispParams :: [DispParam]
+      { dispType       :: DispType
+      , dispParamTypes :: [DispParam]
       } deriving (Eq, Show)
 
 data DispType
@@ -161,10 +162,10 @@ data DispType
 data DispParam
     = Name T.Text
     | Filename T.Text
-    | CreationDate T.Text
-    | ModDate T.Text
-    | ReadDate T.Text
-    | Size T.Text
+    | CreationDate UTCTime
+    | ModDate UTCTime
+    | ReadDate UTCTime
+    | Size Integer
     | OtherParam T.Text T.Text
       deriving (Eq, Show)
 --------------------------------------------------------------------

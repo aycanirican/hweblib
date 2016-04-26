@@ -3,7 +3,7 @@ Version:             0.7.0
 Synopsis:            Haskell Web Library
 Description:
   The library includes attoparsec based incremental parsers for
-  rfc2616 (http) and rfc3986 (uri), rfc2045-46 (mime). The package
+  rfc7230 (http) and rfc3986 (uri), rfc2045-46 (mime). The package
   name will subject to change due to broad range of rfc coverage.
 
 Homepage:            http://github.com/aycanirican/hweblib
@@ -23,29 +23,41 @@ Library
   ghc-options:       -Wall -fwarn-tabs -funbox-strict-fields
                      -fno-warn-unused-do-bind
   -- Modules exported by the library.
-  Exposed-modules: 
-      Network.Types
-    , Network.Http 
-    , Network.Parser.RfcCommon
-    , Network.Parser.Rfc2234
-    , Network.Parser.Rfc2822
-    , Network.Parser.Rfc2045
-    , Network.Parser.Rfc2046
-    , Network.Parser.Rfc3986
-    , Network.Parser.Rfc2616 
-    , Network.Parser.Mime
+  Exposed-modules: Network.Types
+                 , Network.Http 
+                 , Network.Parser.RfcCommon
+                 , Network.Parser.Rfc2045
+                 , Network.Parser.Rfc2046
+                 , Network.Parser.Rfc2183
+                 , Network.Parser.Rfc2234
+                 , Network.Parser.Rfc2388
+                 , Network.Parser.Rfc2822
+                 , Network.Parser.Rfc5234
+                 , Network.Parser.Rfc3986
+                 , Network.Parser.Rfc5322
+                 , Network.Parser.Rfc7230
+                 , Network.Parser.Mime
 
   -- Packages needed in order to build this package.
-  Build-depends:
-    base >= 4 && < 5
-    , containers
-    , bytestring
-    , mtl 
-    , transformers
-    , text
-    , attoparsec
-    , time
+  Build-depends: base >= 4 && < 5
+               , containers
+               , bytestring
+               , mtl 
+               , transformers
+               , text
+               , attoparsec
+               , scientific
+               , time
 
+test-suite doctest
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   test
+  ghc-options:      -threaded
+  main-is:          doctests.hs
+  build-depends:    base, doctest, Glob
+  default-language: Haskell2010
+  ghc-options:      -Wall -threaded  
+                             
 Test-suite testsuite
   Type:              exitcode-stdio-1.0
   hs-source-dirs:    src test
@@ -55,48 +67,47 @@ Test-suite testsuite
                      -fno-warn-unused-do-bind
   ghc-prof-options:  -prof -auto-all
 
-  Other-modules: 
-      Test.Parser.Rfc3986
-    , Test.Parser.Rfc2045
-    , Test.Parser.Rfc2616
-    , Test.Parser.Rfc2822
-    , Test.Parser.Parser
-    , Network.Types
-    , Network.Http 
-    , Network.Parser.RfcCommon
-    , Network.Parser.Rfc2234
-    , Network.Parser.Rfc2822
-    , Network.Parser.Rfc2045
-    , Network.Parser.Rfc2046
-    , Network.Parser.Rfc3986
-    , Network.Parser.Rfc2616 
-    , Network.Parser.Mime
+  Other-modules: Test.Parser.Rfc3986
+               , Test.Parser.Rfc2045
+               , Test.Parser.Rfc2822
+               , Test.Parser.Rfc7230
+               , Test.Parser.Parser
+               , Network.Types
+               , Network.Http 
+               , Network.Parser.RfcCommon
+               , Network.Parser.Rfc2234
+               , Network.Parser.Rfc2822
+               , Network.Parser.Rfc2045
+               , Network.Parser.Rfc2046
+               , Network.Parser.Rfc3986
+               , Network.Parser.Mime
 
-  Build-depends:
-    base >= 4 && < 5
-    , containers
-    , bytestring
-    , mtl
-    , transformers
-    , attoparsec
-    , HUnit
-    , time
+  Build-depends: base >= 4 && < 5
+               , containers
+               , bytestring
+               , mtl
+               , transformers
+               , attoparsec
+               , scientific
+               , HUnit
+               , time
+               , text
 
-benchmark benchmark
-  Type:             exitcode-stdio-1.0
-  hs-source-dirs:   src test
-  Main-is:          Benchmark.hs
-  Default-language:  Haskell2010
+-- benchmark benchmark
+--   Type:             exitcode-stdio-1.0
+--   hs-source-dirs:   src test
+--   Main-is:          Benchmark.hs
+--   Default-language:  Haskell2010
 
-  Build-depends:
-    base >= 4 && < 5
-    , containers
-    , bytestring
-    , mtl
-    , transformers
-    , attoparsec
-    , criterion
-    , HUnit
+--   Build-depends:
+--     base >= 4 && < 5
+--     , containers
+--     , bytestring
+--     , mtl
+--     , transformers
+--     , attoparsec
+--     , criterion
+--     , HUnit
 
 source-repository head
   type:     git

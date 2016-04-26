@@ -18,36 +18,72 @@ import           Control.Applicative
 import           Control.Monad                    (join)
 import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
+import           Data.Attoparsec.Combinator
+import           Data.ByteString
+import qualified Data.ByteString.Char8            as BSC
+import           Data.Monoid
 import           Data.Word                        (Word8)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2045
 import           Network.Parser.Rfc2234
+import           Network.Parser.RfcCommon
 --------------------------------------------------------------------------------
 -- Prelude.map Data.Char.ord "'()+_,-./:=?"
--- bcharsnospaceSet' :: [Word8]
--- bcharsnospaceSet' = [39,40,41,43,95,44,45,46,47,58,61,63]
 bcharsnospacePred :: Word8 -> Bool
-bcharsnospacePred w = digitPred w
-                       || alphaPred w
-                       || inClass "'()+_,-./:=?" w -- F.memberWord8 w (F.fromList bcharsnospaceSet')
+bcharsnospacePred w
+  =  digitPred w
+  || alphaPred w
+  || inClass "'()+_,-./:=?" w
+
 bcharsnospace :: Parser Word8
 bcharsnospace = satisfy bcharsnospacePred
 
 bchars = bcharsnospace <|> satisfy (== 32)
 
 -- TODO: 0*69<bchars> bcharsnospace
-boundary = many1 bchars
-dashBoundary = word8 45 *> word8 45 *> boundary
+boundary :: Parser [Word8]
+boundary = manyNtoM 0 69 bchars
 
-encapsulation = ret <$> delimiter <* transportPadding
-                <*> crlf *> bodyPart
-    where ret d b = (d,b)
+-- >>> parseOnly (dashBoundary "hebeluphodolo") "--hebeluphodolo"
+-- Right ()
+dashBoundary :: ByteString -> Parser ()
+dashBoundary str = (word8 45 *> word8 45 *> AC.string str <?> "invalid boundary") >> return ()
 
-delimiter = crlf *> dashBoundary
+encapsulation :: Parser () -> Parser ([Header], [Word8])
+encapsulation boundaryParser
+  = (delimiter boundaryParser >> transportPadding >> crlf) *> bodyPart boundaryParser
 
--- discardText = many line *> text
---   where line = option 32 (many text *> crlf)
+delimiter :: Parser () -> Parser ()
+delimiter boundaryParser = crlf *> boundaryParser
 
-bodyPart = ret <$> mimePartHeaders
-           <*> option [] (crlf *> many' octet)
+closeDelimiter :: Parser () -> Parser ()
+closeDelimiter boundaryParser = boundaryParser >> AC.string "--" >> return ()
+
+discardText = many line *> text
+  where line = option 32 (many text *> crlf)
+
+bodyPart :: Parser ()
+         -> Parser ([Header], [Word8])
+bodyPart boundaryParser
+  = ret <$> (mimePartHeaders <?> "invalid headers")
+        <*> option [] (crlf *> manyTill octet boundaryParser)
     where ret hs d = (hs,d)
+
+preamble, epilogue :: Parser Word8
+preamble = discardText *> return 0
+epilogue = discardText *> return 0
+
+-- >>> c <- Prelude.readFile "test/mime-wiki.txt"
+multipartBody :: ByteString -> Parser ([Header], [Word8])
+multipartBody boundary = do
+  let boundaryParser = dashBoundary boundary <* transportPadding
+--   option 0 (preamble <* crlf)
+  body <- boundaryParser *> (bodyPart boundaryParser <?> "invalid bodyPart") -- <* many (encapsulation boundaryParser)
+  closeDelimiter boundaryParser >> transportPadding
+--  option 0 (crlf *> epilogue)
+  return body
+
+-- mimeBoundary :: Maybe ByteString -> Parser ByteString
+-- mimeBoundary Nothing = pack <$> (AC.string "--" *> manyNtoM 0 69 bchars)
+-- mimeBoundary (Just s) = AC.string ("--" <> s) <* skipMany (AC.char '-')
+

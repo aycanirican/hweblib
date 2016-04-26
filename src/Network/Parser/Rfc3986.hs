@@ -15,16 +15,17 @@
 --  TODO: implement ipv6 and ipvfuture
 
 module Network.Parser.Rfc3986 where
-
 --------------------------------------------------------------------------------
 import           Control.Applicative
+import           Control.Monad
 import           Data.Attoparsec.ByteString
-import qualified Data.Attoparsec.ByteString.Char8 as DAC
+import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString
 import qualified Data.ByteString.Char8            as C
 import           Data.Char                        (digitToInt, isAsciiLower,
                                                    isAsciiUpper)
 import           Data.List                        (concat)
+import           Data.Monoid
 import           Data.Typeable                    (Typeable)
 import           Data.Word                        (Word64, Word8)
 import           Prelude                          hiding (take, takeWhile)
@@ -34,29 +35,23 @@ import qualified Network.Parser.RfcCommon         as RC
 import           Network.Types
 --------------------------------------------------------------------------------
 
--- Prelude.map ord "!$&'()*+,;="
--- subDelimsSet = [33,36,38,39,40,41,42,43,44,59,61]
-isSubDelims = inClass "!$&'()*+,;=" -- AF.memberWord8 w $ AF.fromList subDelimsSet
 subDelims :: Parser Word8
-subDelims =  satisfy isSubDelims
+subDelims =  satisfy $ inClass "!$&'()*+,;="
 
--- Prelude.map ord ":/?#[]@"
--- genDelimsSet = [58,47,63,35,91,93,64]
-isGenDelims = inClass ":/?#[]@" -- AF.memberWord8 w $ AF.fromList genDelimsSet
 genDelims :: Parser Word8
-genDelims =  satisfy isGenDelims
+genDelims =  satisfy $ inClass ":/?#[]@"
 
-isReserved w = isGenDelims w || isSubDelims w
 reserved :: Parser Word8
-reserved = satisfy isReserved
+reserved = genDelims <|> subDelims
 
 unreserved :: Parser Word8
 unreserved = alpha <|> digit <|> satisfy (inClass "-._~")
 
 pctEncoded :: Parser Word8
-pctEncoded = cat <$> word8 37
-             <*> satisfy hexdigPred
-             <*> satisfy hexdigPred
+pctEncoded
+  = cat <$> AC.char '%'
+        <*> satisfy hexdigPred
+        <*> satisfy hexdigPred
   where
     cat _ b c = toTen b * 16 + toTen c
     toTen w | w >= 48 && w <= 57  =  fromIntegral (w - 48)
@@ -64,20 +59,40 @@ pctEncoded = cat <$> word8 37
             | otherwise           =  fromIntegral (w - 55)
 {-# INLINABLE pctEncoded #-}
 
+uchar :: String -> Parser Word8
 uchar extras = unreserved <|> pctEncoded <|> subDelims <|> satisfy (inClass extras)
+
+pchar :: Parser Word8
 pchar = uchar ":@"
-fragment :: Parser [Word8]
-fragment = (35:) <$> many' (uchar ":@/?")
-query = (63:) <$> many' (uchar ":@/?")
+
+fragment :: Parser ByteString
+fragment = query
+
+-- >>> parse query "foo=bar&zoo=yoo "
+-- Done " " "foo=bar&zoo=yoo"
+query :: Parser ByteString
+query = pack <$> many (uchar ":@/?")
+
 segment, segmentNz, segmentNzNc, slashSegment :: Parser [Word8]
-segment = many' pchar
+segment = many pchar
 segmentNz = many1 pchar
 segmentNzNc = many1 $ uchar "@"
 slashSegment = (:) <$> word8 47 <*> segment
-pathRootless = RC.appcon <$> segmentNz <*> many' slashSegment
-pathNoscheme = RC.appcon <$> segmentNzNc <*> many' slashSegment
-pathAbsolute = (:) <$> word8 47 <*> option [] pathRootless
-pathAbempty = Prelude.concat <$> many' slashSegment
+
+-- >> parse pathRootless "foo/bar/baz "
+-- Done " " "foo/bar/baz"
+pathRootless :: Parser ByteString
+pathRootless = (\a b -> pack (a ++ join b)) <$> segmentNz <*> many slashSegment
+
+pathNoscheme :: Parser ByteString
+pathNoscheme = (\a b -> pack (a ++ join b)) <$> segmentNzNc <*> many slashSegment
+
+pathAbsolute :: Parser ByteString
+pathAbsolute = ("/" <>) <$> (word8 47 *> option mempty pathRootless)
+
+pathAbempty :: Parser ByteString
+pathAbempty = pack . join <$> many slashSegment
+
 regName = many' (unreserved <|> pctEncoded <|> subDelims)
 
 decOctet :: Parser [Word8]
@@ -94,82 +109,85 @@ ipv4address = ret <$> decOctet <* word8 46
                   <*> decOctet
   where ret a b c d = a++[46]++b++[46]++c++[46]++d
 
-port = many' digit
+port :: Parser ByteString
+port = pack <$> many' digit
 
 -- TODO: IP-literal
 -- host = ipLiteral <|> ipv4address <|> regName
-host = regName <|> ipv4address
-userinfo = do
-  uu <- many' (unreserved <|> pctEncoded <|> subDelims <|> word8 58)
-  word8 64
-  return uu
+
+host :: Parser ByteString
+host = pack <$> (regName <|> ipv4address)
+
+userinfo :: Parser ByteString
+userinfo = pack <$> many (unreserved <|> pctEncoded <|> subDelims <|> word8 58) <* word8 64
 
 authority :: Parser (Maybe URIAuth)
 authority = do
-  uu <- option [] (try userinfo)
+  uu <- option mempty userinfo
   uh <- host
-  up <- option [] (word8 58 *> port)
+  up <- option mempty (word8 58 *> port)
   return . Just $ URIAuth
-            { uriUserInfo = C.unpack $ pack uu
-            , uriRegName  = C.unpack $ pack uh
-            , uriPort     = C.unpack $ pack up
+            { uriUserInfo = uu
+            , uriRegName  = uh
+            , uriPort     = up
             }
 
-scheme = (:) <$> alpha <*> many' (alpha <|> digit <|> satisfy (inClass "+-."))
+scheme :: Parser ByteString
+scheme = (\x xs -> pack (x:xs)) <$> alpha
+                                <*> many (alpha <|> digit <|> satisfy (inClass "+-."))
 
-relativePart = do try (word8 47 *> word8 47)
-                  uu <- option Nothing authority
-                  pa <- pathAbempty
-                  return (uu,pa)
-          <|> ((Nothing,) <$> pathAbsolute)
-          <|> ((Nothing,) <$> pathNoscheme)
-          <|> pure (Nothing, [])
+relativePart :: Parser (Maybe URIAuth, ByteString)
+relativePart = ((,) <$> (word8 47 *> word8 47 *> option Nothing authority)
+                    <*> pathAbempty)
+               <|> ((Nothing,) <$> pathAbsolute)
+               <|> ((Nothing,) <$> pathNoscheme)
+               <|> pure (Nothing, mempty)
 
 relativeRef = do
   (ua,up) <- relativePart
-  uq <- option [] (word8 63 *> query)
-  uf <- option [] (word8 35 *> fragment)
-  return URI { uriScheme = RC.toRepr []
+  uq <- option mempty (word8 63 *> query)
+  uf <- option mempty (word8 35 *> fragment)
+  return URI { uriScheme = mempty
              , uriAuthority = ua
-             , uriPath = RC.toRepr up
-             , uriQuery = RC.toRepr uq
-             , uriFragment = RC.toRepr uf
+             , uriPath = up
+             , uriQuery = uq
+             , uriFragment = uf
              }
 
-hierPart :: Parser (Maybe URIAuth, [Word8])
+hierPart :: Parser (Maybe URIAuth, ByteString)
 hierPart = do try (word8 47 *> word8 47)
               uu <- option Nothing authority
               pa <- pathAbempty
               return (uu,pa)
        <|> ((Nothing,) <$> pathAbsolute)
        <|> ((Nothing,) <$> pathRootless)
-       <|> pure (Nothing, [])
+       <|> pure (Nothing, mempty)
 
 absoluteUri :: Parser URI
 absoluteUri = do
   us <- scheme
   word8 58
   (ua,up) <- hierPart
-  uq <- option [] (word8 63 *> query)
-  return URI { uriScheme = RC.toRepr us
+  uq <- option mempty (word8 63 *> query)
+  return URI { uriScheme = us
              , uriAuthority = ua
-             , uriPath = RC.toRepr up
-             , uriQuery = RC.toRepr uq
-             , uriFragment = RC.toRepr []
+             , uriPath = up
+             , uriQuery = uq
+             , uriFragment = mempty
              }
 
 uri = do
   us <- scheme
   word8 58
   (ua,up) <- hierPart
-  uq <- option [] (word8 63 *> query)
-  uf <- option [] (word8 35 *> fragment)
+  uq <- option mempty (word8 63 *> query)
+  uf <- option mempty (word8 35 *> fragment)
   return URI
-         { uriScheme = RC.toRepr us
+         { uriScheme = us
          , uriAuthority = ua
-         , uriPath = RC.toRepr up
-         , uriQuery = RC.toRepr uq
-         , uriFragment = RC.toRepr uf
+         , uriPath = up
+         , uriQuery = uq
+         , uriFragment = uf
          }
 
 uriReference = uri <|> relativeRef
