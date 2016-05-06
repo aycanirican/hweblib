@@ -1,4 +1,3 @@
-{-# LANGUAGE ConstraintKinds   #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -145,7 +144,7 @@ word :: Parser ByteString
 word = atom <|> quoted_string
 
 phrase :: Parser ByteString
-phrase = B.concat <$> many1 word
+phrase = B.intercalate " " <$> many1 word
 
 utext :: Parser Word8
 utext = no_ws_ctl <|> satisfy (\w -> w>=33 && w<=126)
