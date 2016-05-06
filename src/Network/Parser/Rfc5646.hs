@@ -1,6 +1,4 @@
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections     #-}
 
 -- |
 -- Module      :  Network.Parser.5646
@@ -23,14 +21,8 @@ import           Data.Attoparsec.ByteString       as A
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.Attoparsec.Combinator
 import           Data.ByteString                  as B hiding (count, singleton)
-import           Data.Char                        (digitToInt)
 import           Data.Monoid
-import           Data.Scientific
-import           Data.Time
-import           Data.Typeable
 import           Data.Word
-import qualified GHC.Generics                     as GHC
-import           Prelude                          hiding (product)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc5234
 --------------------------------------------------------------------------------

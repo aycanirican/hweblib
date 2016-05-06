@@ -1,6 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
-
 -- |
 -- Module      :  Network.Parser.3986
 -- Copyright   :  Aycan iRiCAN 2010-2015
@@ -26,7 +25,6 @@ import           Data.Char                        (digitToInt, isAsciiLower,
                                                    isAsciiUpper)
 import           Data.List                        (concat)
 import           Data.Monoid
-import           Data.Typeable                    (Typeable)
 import           Data.Word                        (Word64, Word8)
 import           Prelude                          hiding (take, takeWhile)
 --------------------------------------------------------------------------------

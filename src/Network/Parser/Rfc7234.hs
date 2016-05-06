@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds           #-}
+{-# LANGUAGE DeriveDataTypeable  #-}
 {-# LANGUAGE DeriveGeneric       #-}
 {-# LANGUAGE OverloadedStrings   #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -24,18 +25,12 @@ module Network.Parser.Rfc7234 where
 import           Control.Applicative
 import           Data.Attoparsec.ByteString       as A
 import           Data.Attoparsec.ByteString.Char8 as AC
-import           Data.Attoparsec.Combinator
 import           Data.ByteString
 import qualified Data.ByteString.Char8            as BC
-import           Data.Char                        (digitToInt)
-import           Data.Functor
-import           Data.Monoid
-import           Data.Scientific
-import           Data.Time
+import           Data.Time                        (UTCTime (..))
 import           Data.Typeable
 import qualified GHC.Generics                     as GHC
 import           GHC.TypeLits
-import           Prelude                          hiding (product)
 --------------------------------------------------------------------------------
 import qualified Network.Parser.Rfc5234           as R5234
 import           Network.Parser.Rfc7230
@@ -57,7 +52,7 @@ data CacheDirective
   | ProxyRevalidate
   | SMaxAge Integer
   | CacheDirectiveExtension ByteString (Maybe ByteString)
-    deriving (Eq,Show,Typeable,GHC.Generic)
+    deriving (Eq, Show, Typeable, GHC.Generic)
 -- * 1.2 Syntax Notation
 
 -- * 1.2.1.  Delta Seconds

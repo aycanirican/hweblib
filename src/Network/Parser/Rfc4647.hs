@@ -1,6 +1,4 @@
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections     #-}
 
 -- |
 -- Module      :  Network.Parser.4647
@@ -20,15 +18,8 @@ module Network.Parser.Rfc4647 where
 import           Control.Applicative
 import           Data.Attoparsec.ByteString       as BS
 import           Data.Attoparsec.ByteString.Char8 as AC hiding (digit)
-import           Data.Attoparsec.Combinator
 import           Data.ByteString
-import           Data.Char                        (digitToInt)
-import           Data.Monoid
-import           Data.Scientific
-import           Data.Time
-import           Data.Typeable
 import           Data.Word
-import qualified GHC.Generics                     as GHC
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc5234
 --------------------------------------------------------------------------------

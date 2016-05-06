@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections     #-}
 
@@ -22,13 +21,6 @@ import           Data.Attoparsec.ByteString       as BS
 import           Data.Attoparsec.ByteString.Char8 as AC
 import           Data.Attoparsec.Combinator
 import           Data.ByteString
-import           Data.Char                        (digitToInt)
-import           Data.Monoid
-import           Data.Scientific
-import           Data.Time
-import           Data.Typeable
-import qualified GHC.Generics                     as GHC
-import           Prelude                          hiding (product)
 --------------------------------------------------------------------------------
 --------------------------------------------------------------------------------
 

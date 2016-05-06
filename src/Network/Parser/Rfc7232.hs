@@ -1,4 +1,3 @@
-{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -19,16 +18,9 @@ module Network.Parser.Rfc7232 where
 import           Control.Applicative
 import           Data.Attoparsec.ByteString       as A
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.Attoparsec.Combinator
 import           Data.ByteString
-import           Data.Char                        (digitToInt)
 import           Data.Monoid
-import           Data.Scientific
-import           Data.Time
-import           Data.Typeable
 import           Data.Word
-import qualified GHC.Generics                     as GHC
-import           Prelude                          hiding (product)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc5234           (dquote)
 import           Network.Parser.Rfc7230

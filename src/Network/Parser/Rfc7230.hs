@@ -1,6 +1,6 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveGeneric      #-}
+{-# LANGUAGE OverloadedStrings  #-}
 -- |
 -- Module      :  Network.Parser.7230
 -- Copyright   :  Aycan iRiCAN 2010-2015
