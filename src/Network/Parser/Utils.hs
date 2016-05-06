@@ -33,6 +33,6 @@ nDigitInt n p = do
 
 -- | Parse `p` at max `n` times
 maxP :: Int -> Parser a -> Parser [a]
-maxP 0 p = return mempty
+maxP 0 p = return empty
 maxP n p = ((:) <$> p <*> maxP (n-1) p) <|> return mempty
 
