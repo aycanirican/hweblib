@@ -61,7 +61,7 @@ data MediaType
 
 -- |
 -- >>> parseOnly media_type "multipart/form-data; boundary=------------------------d380791e8587bb9a"
--- Right (MediaType "multipart" "form-data" [("boundary","------------------------d380791e8587bb9a")]
+-- Right (MediaType "multipart" "form-data" [("boundary","------------------------d380791e8587bb9a")])
 media_type = MediaType <$> type_ <* AC.char '/'
              <*> subtype
              <*> many (ows *> AC.char ';' *> ows *> parameter)
