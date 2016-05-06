@@ -65,19 +65,6 @@ quotedPair = ret <$> word8 92 <*> char
     where ret a b = [a,b]
 {-# INLINABLE quotedPair #-}
 
--- | Parse quoted string
--- >>> parseOnly quotedString "\"asd\""
--- Right "asd"
-quotedString :: Parser ByteString
-quotedString = do
-  r <- word8 34 *> manyTill (do
-                             a <- option [] quotedPair
-                             b <- qdtext
-                             return $ a++b:[])
-                            (word8 34)
-  return . pack . join $ r
-{-# INLINABLE quotedString #-}
-
 -- | Parse a character but not a control character.
 text :: Parser Word8
 text = crlf <|> BS.satisfy char_not_ctl

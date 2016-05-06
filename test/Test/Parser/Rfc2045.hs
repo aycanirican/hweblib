@@ -2,8 +2,7 @@
 module Test.Parser.Rfc2045 where
 --------------------------------------------------------------------------------
 import           Data.Attoparsec.ByteString
-import           Data.ByteString            as W
-import qualified Data.ByteString.Char8      as C
+import           Data.ByteString
 import qualified Data.Map                   as M
 import           Test.HUnit
 import           Test.Parser.Parser
@@ -13,17 +12,18 @@ import           Network.Parser.Rfc2234
 import           Network.Parser.RfcCommon
 --------------------------------------------------------------------------------
 tests = TestList $ fmap TestCase lst
-lst = [test_version, test_quotedPrintable]
 
-test_version = ae "mime-version" (Just (Header VersionH (C.pack "1.0") M.empty)) (aP version "Mime-Version: 1.0 ")
+lst = [ test_version
+      , test_quotedPrintable]
 
-qpString = C.pack "If you believe that truth=3dbeauty, then surely=20=\nmathematics is the most beautiful branch of philosophy.\0"
+test_version = ae "mime-version" (Just (Header VersionH "1.0" M.empty)) (aP version "Mime-Version: 1.0 ")
 
-qpStringRes = C.pack "If you believe that truth=beauty, then surely mathematics is the most beautiful branch of philosophy."
+qpString = "If you believe that truth=3dbeauty, then surely=20=\nmathematics is the most beautiful branch of philosophy.\0"
+qpStringRes = "If you believe that truth=beauty, then surely \nmathematics is the most beautiful branch of philosophy."
 
 test_quotedPrintable = ae "quotedPrintable"
                        (Just qpStringRes)
-                       (aP quotedPrintable qpString)
+                       (aP quoted_printable qpString)
 
 --mimecontent1 = Content
 --test_content = ae "content"

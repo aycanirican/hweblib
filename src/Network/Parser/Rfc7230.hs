@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveGeneric     #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -16,7 +17,7 @@ module Network.Parser.Rfc7230
   where
 --------------------------------------------------------------------------------
 import           Control.Applicative
-import           Control.Monad                    (join, liftM, liftM2)
+import           Control.Monad                    (join)
 import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString                  hiding (count)
@@ -26,24 +27,27 @@ import           Data.Monoid
 import           Data.Scientific
 import qualified Data.Text                        as T
 import qualified Data.Text.Encoding               as T
+import           Data.Typeable
 import           Data.Word                        (Word8)
+import           GHC.Generics                     (Generic)
 import           Numeric                          (readHex)
 --------------------------------------------------------------------------------
 import qualified Network.Parser.Rfc3986           as R3986
-import           Network.Parser.Rfc5234
+import           Network.Parser.Rfc5234           as R5234
+import           Network.Parser.Utils
 import           Network.Types
 --------------------------------------------------------------------------------
 
 data StartLine
   = RequestLine ByteString RequestTarget HTTPVersion
   | StatusLine HTTPVersion ByteString ByteString
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic, Typeable)
 
 data HTTPMessage
   = HTTPMessage { status  :: StartLine
                 , headers :: [(ByteString, ByteString)]
                 , body    :: Maybe ByteString
-                } deriving (Eq, Show)
+                } deriving (Eq, Show, Generic, Typeable)
 
 data TransferCoding
   = Chunked
@@ -51,43 +55,43 @@ data TransferCoding
   | Deflate
   | GZip
   | TransferExtension ByteString [(ByteString, ByteString)]
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic, Typeable)
 
 data Chunk
   = Chunk Int [(ByteString, ByteString)] ByteString
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic, Typeable)
 
 data TrailerPart
   = TrailerPart [(ByteString, ByteString)]
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic, Typeable)
 
 data ChunkedBody
   = ChunkedBody [Chunk] TrailerPart
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic, Typeable)
 
 data TCoding
   = TCoding TransferCoding (Maybe Scientific)
   | Trailers
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic, Typeable)
 
 data RequestTarget
   = OriginForm ByteString ByteString
   | AbsoluteForm URI
   | AuthorityForm (Maybe URIAuth)
   | AsteriskForm
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic, Typeable)
 
 data Protocol
   = ProtocolName ByteString
   | ProtocolVersion ByteString
-  | ProtocolNameVersion ByteString ByteString deriving (Eq, Show)
+  | ProtocolNameVersion ByteString ByteString deriving (Eq, Show, Generic, Typeable)
 
-data Via = Via [(Protocol, ReceivedBy)] deriving (Eq, Show)
+data Via = Via [(Protocol, ReceivedBy)] deriving (Eq, Show, Generic, Typeable)
 
 data ReceivedBy
   = ReceivedByHost ByteString (Maybe ByteString) -- ^ hostname port
   | ReceivedByPseudonym ByteString       -- ^ token
-    deriving (Eq, Show)
+    deriving (Eq, Show, Generic, Typeable)
 
 -- >>> parse http_version "HTTP/1.1"
 -- Done "" (HTTPVersion {httpMajor = 1, httpMinor = 1})
@@ -101,10 +105,14 @@ http_message = do
   sl <- start_line
   xs <- many (header_field <* crlf)
   crlf
-  m <- option Nothing (Just <$> message_body)
-  return $ HTTPMessage sl xs m
+  return $ HTTPMessage sl xs mempty
 
 -- 2.7.  Uniform Resource Identifiers
+{-
+     absolute-path = 1*( "/" segment )
+     partial-URI   = relative-part [ "?" query ]
+
+-}
 absolute_path :: Parser [ByteString]
 absolute_path = fmap pack <$> many1 (AC.char '/' *> R3986.segment)
 
@@ -130,6 +138,9 @@ reason_phrase :: Parser ByteString
 reason_phrase = pack <$> many (htab <|> sp <|> vchar <|> obs_text)
 
 -- 3.2.  Header Fields
+-- |
+-- >>> parseOnly header_field "User-Agent: curl/7.47.0"
+-- Right ("User-Agent","curl/7.47.0")
 header_field :: Parser (ByteString, ByteString)
 header_field = (,) <$> (field_name <* word8 58 <* ows) <*> field_value <* ows
 
@@ -138,7 +149,6 @@ field_name = token
 
 field_value :: Parser ByteString
 field_value = BSC.concat <$> many (field_content <|> obs_fold)
-
 
 -- | Slightly modified version to catch below example.
 -- >>> parseOnly field_content "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:29.0) Gecko/20100101 Firefox/29.0"
@@ -169,12 +179,10 @@ token = pack <$> many1 tchar
 
 tchar :: Parser Word8
 tchar = satisfy pred <|> digit <|> alpha
-  where pred = inClass "!#$%&'*+-.^_`|~"
+  where pred = inClass "!#$%&'*+.^_`|~-"
 
 quoted_string :: Parser ByteString
-quoted_string = ret . join <$> (dquote *> many (asList qdtext <|> quoted_pair) <* dquote)
-  where
-    ret x = "\"" <> (pack x) <>  "\""
+quoted_string = pack . join <$> (dquote *> many (asList qdtext <|> quoted_pair) <* dquote)
 
 qdtext :: Parser Word8
 qdtext = htab <|> sp <|> satisfy pred <|> obs_text
@@ -211,8 +219,9 @@ message_body = pack <$> many octet
 transfer_encoding = dash1 transfer_coding
 
 -- 3.3.2.  Content-Length
-content_length :: Parser Int
-content_length = either (fail "Not an integer") id . floatingOrInteger <$> AC.scientific
+content_length :: Parser Integer
+content_length = read <$> many1 AC.digit
+
 -- 4.  Transfer Codings
 transfer_coding :: Parser TransferCoding
 transfer_coding
@@ -387,6 +396,13 @@ protocol_version = token
 dash :: Parser a -> Parser [a]
 dash p = (:) <$> p <*> many (ows *> word8 44 *> ows *> p)
 
+-- |
+-- >>> parseOnly (dash1 AC.digit) "1"
+-- Right "1"
+-- >>> parseOnly (dash1 AC.digit) "1,2"
+-- Right "12"
+-- >>> parseOnly (dash1 token) ""
+-- Left "not enough input"
 dash1 :: Parser a -> Parser [a]
 dash1 = dashN 1
 
@@ -417,11 +433,6 @@ sepByN n p s = (:) <$> p <*> count (n-1) (s *> p)
 sepByMaxN :: Int -> Parser a -> Parser () -> Parser [a]
 sepByMaxN 0 p s = return mempty
 sepByMaxN n p s = ((:) <$> p <*> maxP (n-1) (s *> p)) <|> return mempty
-
--- | Parse `p` at max `n` times
-maxP :: Int -> Parser a -> Parser [a]
-maxP 0 p = return mempty
-maxP n p = ((:) <$> p <*> maxP (n-1) p) <|> return mempty
 
 -- dashNtoM :: Parser a -> Parser [a]
 -- dashNtoM n m p

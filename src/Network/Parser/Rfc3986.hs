@@ -134,7 +134,7 @@ authority = do
 
 scheme :: Parser ByteString
 scheme = (\x xs -> pack (x:xs)) <$> alpha
-                                <*> many (alpha <|> digit <|> satisfy (inClass "+-."))
+                                <*> many (alpha <|> digit <|> satisfy (inClass "+.-"))
 
 relativePart :: Parser (Maybe URIAuth, ByteString)
 relativePart = ((,) <$> (word8 47 *> word8 47 *> option Nothing authority)

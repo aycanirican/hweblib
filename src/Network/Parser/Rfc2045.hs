@@ -26,7 +26,8 @@ import           Data.Monoid
 import           Data.Word                        (Word8)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
-import           Network.Parser.Rfc2822           (comment, msg_id, text)
+import           Network.Parser.Rfc2822           (comment, msg_id,
+                                                   quoted_string, text)
 import           Network.Parser.RfcCommon         hiding (text)
 --------------------------------------------------------------------------------
 -- TODO: implement fields of rfc 822
@@ -41,19 +42,19 @@ import           Network.Parser.RfcCommon         hiding (text)
 --  where ret eh f = ...
 mimePartHeaders = entityHeaders
 
---mimeMessageHeaders = ret <$> entityHeaders <*> fields <*> (version <* crlf)
---  where ret eh f v = ...
+-- mimeMessageHeaders = ret <$> entityHeaders <*> fields <*> (version <* crlf)
+--  where ret eh f v =
 
 entityHeaders :: Parser [Header]
-entityHeaders = many1 entityHeader
+entityHeaders = many entityHeader
 
 entityHeader :: Parser Header
-entityHeader  =   version     <* crlf
-              <|> content     <* crlf
-              <|> encoding    <* crlf
-              <|> description <* crlf
-              <|> contentId   <* crlf
-              <|> mimeExtensionField <* crlf
+entityHeader  =   (version            <* crlf)
+              <|> (content            <* crlf)
+              <|> (encoding           <* crlf)
+              <|> (description        <* crlf)
+              <|> (contentId          <* crlf)
+              <|> (mimeExtensionField <* crlf)
 
 -- * 4.  MIME-Version Header Field
 
@@ -64,40 +65,39 @@ version = ret <$> (AC.stringCI "mime-version" *> colonsp *> AC.decimal) -- ':'
 
 -- * 5. Content-Type Header Field
 
-ietfToken :: Parser ByteString
-ietfToken = Control.Applicative.empty
+ietf_token :: Parser ByteString
+ietf_token = Control.Applicative.empty
 
-ianaToken :: Parser ByteString
-ianaToken = Control.Applicative.empty
+iana_token :: Parser ByteString
+iana_token = Control.Applicative.empty
 
--- Prelude.map Data.Char.ord "()<>@,;:\\\"/[]?="
--- tspecialsSet ::[Word8]
--- tspecialsSet = [40,41,60,62,64,44,59,58,92,34,47,91,93,63,61]
 tspecialsPred :: Word8 -> Bool
-tspecialsPred = inClass "()<>@,;:\\\"/[]?=" -- F.memberWord8 w (F.fromList tspecialsSet)
+tspecialsPred = inClass "()<>@,;:\\\"/[]?="
+
 tspecials :: Parser Word8
 tspecials = satisfy tspecialsPred
 
 tokenPred :: Word8 -> Bool
 tokenPred w = charPred w && not (w == 32 || ctlPred w || tspecialsPred w)
+
 token :: Parser [Word8]
 token = many1 $ satisfy tokenPred
 
 attribute :: Parser [Word8]
 attribute = token
 
--- >>> parseOnly
 parameter :: Parser (ByteString, ByteString)
 parameter = res <$> (attribute <* word8 61) <*> value
     where res a v = (pack a, v)
 
-xTokenPred :: Word8 -> Bool
-xTokenPred w = tokenPred w && (w /= 32)
-xToken :: Parser ByteString
-xToken = AC.stringCI "x-" *> (pack <$> many1 (satisfy xTokenPred))
+x_token :: Parser ByteString
+x_token = AC.stringCI "x-" *> (pack <$> many1 (satisfy x_token_pred))
+  where
+    x_token_pred :: Word8 -> Bool
+    x_token_pred w = tokenPred w && (w /= 32)
 
 value :: Parser ByteString
-value = (pack <$> token) <|> quotedString
+value = (pack <$> token) <|> quoted_string
 
 -- discrete and composite types are a little bit different from BNF
 -- definitions in order to keep code flow clean.
@@ -111,17 +111,23 @@ mtype = AC.stringCI "multipart"
         <|> AC.stringCI "message"
         <|> extensionToken
 
--- TODO: subtype = extensionToken <|> ianaToken
+-- TODO: subtype = extensionToken <|> iana_token
 subtype :: Parser ByteString
 subtype = pack <$> token
 
--- TODO: extensionToken = xToken <|> ietfToken
+-- TODO: extensionToken = x_token <|> ietf_token
 extensionToken :: Parser ByteString
-extensionToken = xToken
+extensionToken = x_token
 
+-- >>> parseOnly content "Content-type: text/plain; charset=us-ascii\n"
+-- Right (Header {hType = ContentH, hValue = "textplain", hParams = fromList [("charset","us-ascii")]})
+-- >>> let a = parseOnly content "Content-type: text/plain; charset=us-ascii\n"
+-- >>>     b = parseOnly content "Content-type: text/plain; charset=\"us-ascii\"\n"
+-- >>> in a == b
+-- True
 content :: Parser Header
 content
-  = do ty <- (<>) <$> (AC.stringCI "content-type" *> colonsp *> mtype) <* word8 47 <*> subtype
+  = do ty <- (\a b -> a <> "/" <> b) <$> (AC.stringCI "content-type" *> colonsp *> mtype) <* word8 47 <*> subtype
        ps <-  many (semicolonsp *> parameter)
        return $ Header ContentH ty (M.fromList ps)
 
@@ -137,15 +143,12 @@ mechanism = AC.stringCI "7bit"
             <|> AC.stringCI "binary"
             <|> AC.stringCI "quoted-printable"
             <|> AC.stringCI "base64"
-            <|> xToken <|> ietfToken
+            <|> x_token <|> ietf_token
 
 -- * Quoted Printable
 
-safeCharPred :: Word8 -> Bool
-safeCharPred w = (w >= 33 && w <= 60) || (w >= 62 && w <= 126)
-
-safeChar :: Parser Word8
-safeChar = satisfy safeCharPred
+safe_char :: Parser Word8
+safe_char = satisfy (\w -> (w >= 33 && w <= 60) || (w >= 62 && w <= 126))
 
 hexOctet :: Parser Word8
 hexOctet = ret <$> (word8 61 *> hexdig) <*> hexdig
@@ -160,28 +163,28 @@ transportPadding :: Parser ()
 transportPadding = lwsp >> return ()
 
 ptext :: Parser Word8
-ptext = hexOctet <|> safeChar
+ptext = hexOctet <|> safe_char
 
-qpSection :: Parser [Word8]
-qpSection = many (ptext <|> sp <|> ht)
+qp_section :: Parser [Word8]
+qp_section = many (ptext <|> sp <|> ht)
 
-qpSegment :: Parser [Word8]
-qpSegment = ret <$> qpSection <*> many (sp <|> ht) <*> word8 61
+qp_segment :: Parser [Word8]
+qp_segment = ret <$> qp_section <*> many (sp <|> ht) <*> word8 61
     where ret a [] _ = a
           ret a _  _ = a ++ [32]
 
-qpPart :: Parser [Word8]
-qpPart = qpSection
+qp_part :: Parser [Word8]
+qp_part = qp_section
 
-qpLine :: Parser [Word8]
-qpLine = do
-  a <- many $ (++) <$> qpSegment <*> (transportPadding *> crlf >>= return . (:[]))
-  b <- qpPart <* transportPadding
+qp_line :: Parser [Word8]
+qp_line = do
+  a <- many $ (++) <$> qp_segment <*> (transportPadding *> crlf >>= return . (:[]))
+  b <- qp_part <* transportPadding
   return $ join a ++ b
 
-quotedPrintable :: Parser ByteString
-quotedPrintable = do
-  a <- appcon <$> qpLine <*> many (crlf *> qpLine)
+quoted_printable :: Parser ByteString
+quoted_printable = do
+  a <- appcon <$> qp_line <*> many (crlf *> qp_line)
   return $ pack a
 
 -- * 7.  Content-ID Header Field

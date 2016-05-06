@@ -128,6 +128,9 @@ qtext = satisfy qtextPred
 qcontent :: Parser ByteString
 qcontent = option mempty (pack <$> asList qtext) <|> (pack <$> quotedPair)
 
+-- |
+-- parseOnly quoted_string "\foobar"\""
+-- Just "foobar"
 quoted_string :: Parser ByteString
 quoted_string = do
   ocfws
@@ -135,7 +138,7 @@ quoted_string = do
   r1 <- B.concat <$> (many1 (option [] fws *> qcontent) <|> option [" "] ((:[]) . pack <$> fws))
   dquote
   ocfws
-  return ("\"" <> r1 <> "\"")
+  return r1
 
 -- | * 3.2.6. Miscellaneous tokens
 word :: Parser ByteString

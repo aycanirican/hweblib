@@ -11,7 +11,7 @@ mkDerivation {
   ];
   testHaskellDepends = [
     attoparsec base bytestring containers doctest Glob HUnit mtl
-    scientific time transformers
+    scientific text time transformers
   ];
   homepage = "http://github.com/aycanirican/hweblib";
   description = "Haskell Web Library";

@@ -1,13 +1,27 @@
-module Network.Http where
+{-# LANGUAGE OverloadedStrings #-}
+
+module Network.Http
+  where
 
 --------------------------------------------------------------------------------
-
+import           Control.Applicative
+import           Control.Monad
+import           Control.Monad.IO.Class
 import           Data.Attoparsec.ByteString
-import           Data.ByteString.Char8      as C
-import qualified Network.Parser.Rfc2046     as R2046
-import           Network.Parser.Rfc7230
---import qualified Network.Parser.Rfc2822 as R2822
+import           Data.Attoparsec.ByteString.Char8 as AC
+import           Data.ByteString                  hiding (elem, foldl')
+import           Data.List
+import qualified Data.Map.Strict                  as M
+import           Debug.Trace
 import           Network.Parser.Mime
+import           Network.Parser.Permute
+import qualified Network.Parser.Rfc2045           as R2045
+import qualified Network.Parser.Rfc2046           as R2046
+import qualified Network.Parser.Rfc5234           as R5234
+import qualified Network.Parser.Rfc5322           as R5322
+import qualified Network.Parser.Rfc7230           as R7230
+import qualified Network.Parser.Rfc7231           as R7231
+import qualified Network.Parser.Rfc7234           as R7234
 import           Network.Types
 --------------------------------------------------------------------------------
 
@@ -17,15 +31,129 @@ import           Network.Types
 -- contentLength :: Request -> Maybe Int
 -- contentLength = ehContentLength . entityHeaders . rqHreaders
 
-parseMessage :: Parser HTTPMessage
-parseMessage = http_message
+-- parseMessage :: Parser R7230.HTTPMessage
+-- parseMessage = do
+--   sl <- R7230.start_line
+--   xs <- many headerParser
+--   where
+--     headerParser = representationHeaderField
+--     representationHeaderField = content_type
+--                                 <|> content_encoding
+--                                 <|> content_language
+--                                 <|> content_location
+--     payloadSemantics = content_length
+--                        <|> content_range
+--                        <|> trailer
+--                        <|> transfer_encoding
+--     controls = cache_control
+--                <|> expect
+--                <|> host
+--                <|> max_forwards
+--                <|> pragma
+--                <|> range
+--                <|> te
+--     conditionals = if_match
+--                    <|> if_none_match
+--                    <|> if_modified_since
+--                    <|> if_unmodified_since
+--                    <|> if_range
+--     contentNegotiation = accept
+--                          <|> accept_charset
+--                          <|> accept_encoding
+--                          <|> accept_language
+--     authCredentials = undefined
+
+--     requestContext = from
+--                      <|> referrer
+--                      <|> user_agent
+--     controlData = age
+--                   <|> cache_control
+--                   <|> expires
+--                   <|> date
+--                   <|> location
+--                   <|> retry_after
+--                   <|> vary
+--                   <|> warning
+--     validators = etag
+--                  <|> last_modified
+
+--     authentication_challenges = undefined
+
+--     response_context = accept_ranges
+--                        <|> allow
+--                        <|> server
+
+--     headers = [ ("Content-Length", R7230.content_length)
+--               ]
+
+data HTTPHeaders
+  = HTTPHeaders { contentLength :: Maybe Integer
+                , contentType   :: Maybe R7231.MediaType
+                , otherHeaders  :: [(ByteString, ByteString)]
+                }
+  deriving (Show, Eq)
+
+emptyHTTPHeaders :: HTTPHeaders
+emptyHTTPHeaders = HTTPHeaders Nothing Nothing []
+
+data Entity = Discrete ByteString
+            | Composite [R5322.Message]
+            deriving (Show, Eq)
+
+parseMessage :: Parser (R7230.StartLine, HTTPHeaders, Maybe Entity)
+parseMessage = do
+  sl <- R7230.start_line
+  fs <- many' $ (\i h -> h { contentLength=Just i })
+                  <$> header "Content-Length" R7230.content_length
+            <|> (\i h -> h { contentType=Just i })
+                  <$> header "Content-Type" R7231.content_type
+            <|> (\i h -> h { otherHeaders = i : otherHeaders h } )
+                  <$> R7230.header_field <* R5234.crlf
+  let hs = foldl' (flip ($)) emptyHTTPHeaders fs
+  R5234.crlf
+
+  body <- case contentType hs of
+    Just (R7231.MediaType "multipart" subtype xs) -> case "boundary" `lookup` xs of
+      Just b  -> Just . Composite <$> case subtype of
+        "mixed"       -> R2046.multipartBody b
+        "alternative" -> R2046.multipartBody b
+        "form-data"   -> R2046.multipartBody b
+        _             -> fail $ "unknown content type: " ++ show subtype
+      Nothing -> fail "boundary not found"
+    _ -> case contentLength hs of
+      Just l  -> Just . Discrete . pack <$> replicateM (fromInteger l) anyWord8
+      Nothing -> return Nothing
+
+  return (sl, hs, body)
+  where
+    header :: ByteString -> Parser a -> Parser a
+    header h p = AC.string h *> word8 58 *> R7230.ows *> p <* R5234.crlf
 
 -- TODO: case-insensitive lookup
-hasHeader :: Request -> ByteString -> Maybe ByteString
-hasHeader rq key = lookup key (rqHeaders rq)
+hasHeader :: R7230.HTTPMessage -> ByteString -> Maybe ByteString
+hasHeader rq key = lookup key (R7230.headers rq)
 
-mimes :: Request -> MimeContent
-mimes rq = undefined
+mimes :: Parser [R5322.Message]
+mimes = do
+  ehdrs <- R2045.entityHeaders <* R5234.crlf
+  case contentType ehdrs of
+    Nothing       -> fail "No content-type defined in entity headers"
+    Just (ty, hs) ->
+      if (ty `elem` ["multipart/mixed", "multipart/alternative"])
+      then case M.lookup "boundary" hs of
+             Nothing -> pure []
+             Just b  -> (R2046.multipartBody b)
+      else case M.lookup "boundary" hs of
+             Nothing -> pure []
+             Just b  -> R7230.asList R2046.bodyPart
+  where
+    contentType :: [R2045.Header] -> Maybe (ByteString, (M.Map ByteString ByteString))
+    contentType headers
+      = let chs = Prelude.filter ((== R2045.ContentH) . R2045.hType) headers
+        in case chs of
+        []  -> Nothing
+        a:_ -> Just (R2045.hValue a, R2045.hParams a)
+
 
 {-
 Utku says:

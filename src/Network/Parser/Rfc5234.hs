@@ -52,7 +52,7 @@ octet = anyWord8
 
 -- | Parse a Lightweight Space
 lwsp :: Parser [Word8]
-lwsp = many (wsp <|> crlf *> wsp) <?> "lightweight space"
+lwsp = many (wsp <|> (crlf *> wsp)) <?> "lightweight space"
 {-# INLINABLE lwsp #-}
 
 lfPred = (== 0x0a)

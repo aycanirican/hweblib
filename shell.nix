@@ -6,7 +6,7 @@ let
 
   f = { mkDerivation, attoparsec, base, bytestring, containers
       , doctest, Glob, HUnit, mtl, scientific, stdenv, text, time
-      , transformers
+      , transformers, network
       }:
       mkDerivation {
         pname = "hweblib";
@@ -14,11 +14,11 @@ let
         src = ./.;
         libraryHaskellDepends = [
           attoparsec base bytestring containers mtl scientific text time
-          transformers
+          transformers network
         ];
         testHaskellDepends = [
           attoparsec base bytestring containers doctest Glob HUnit mtl
-          scientific time transformers
+          scientific text time transformers
         ];
         homepage = "http://github.com/aycanirican/hweblib";
         description = "Haskell Web Library";

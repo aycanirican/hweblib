@@ -23,9 +23,11 @@ import           Data.ByteString
 import qualified Data.ByteString.Char8            as BSC
 import           Data.Monoid
 import           Data.Word                        (Word8)
+import           Debug.Trace
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2045
 import           Network.Parser.Rfc2234
+import qualified Network.Parser.Rfc5322           as R5322
 import           Network.Parser.RfcCommon
 --------------------------------------------------------------------------------
 -- Prelude.map Data.Char.ord "'()+_,-./:=?"
@@ -33,7 +35,7 @@ bcharsnospacePred :: Word8 -> Bool
 bcharsnospacePred w
   =  digitPred w
   || alphaPred w
-  || inClass "'()+_,-./:=?" w
+  || inClass "'()+_,./:=?-" w
 
 bcharsnospace :: Parser Word8
 bcharsnospace = satisfy bcharsnospacePred
@@ -49,9 +51,9 @@ boundary = manyNtoM 0 69 bchars
 dashBoundary :: ByteString -> Parser ()
 dashBoundary str = (word8 45 *> word8 45 *> AC.string str <?> "invalid boundary") >> return ()
 
-encapsulation :: Parser () -> Parser ([Header], [Word8])
+encapsulation :: Parser () -> Parser R5322.Message
 encapsulation boundaryParser
-  = (delimiter boundaryParser >> transportPadding >> crlf) *> bodyPart boundaryParser
+  = (delimiter boundaryParser >> transportPadding >> crlf) *> bodyPart
 
 delimiter :: Parser () -> Parser ()
 delimiter boundaryParser = crlf *> boundaryParser
@@ -62,28 +64,36 @@ closeDelimiter boundaryParser = boundaryParser >> AC.string "--" >> return ()
 discardText = many line *> text
   where line = option 32 (many text *> crlf)
 
-bodyPart :: Parser ()
-         -> Parser ([Header], [Word8])
-bodyPart boundaryParser
-  = ret <$> (mimePartHeaders <?> "invalid headers")
-        <*> option [] (crlf *> manyTill octet boundaryParser)
-    where ret hs d = (hs,d)
+bodyPart :: Parser R5322.Message
+bodyPart = R5322.message
 
 preamble, epilogue :: Parser Word8
 preamble = discardText *> return 0
 epilogue = discardText *> return 0
 
 -- >>> c <- Prelude.readFile "test/mime-wiki.txt"
-multipartBody :: ByteString -> Parser ([Header], [Word8])
-multipartBody boundary = do
-  let boundaryParser = dashBoundary boundary <* transportPadding
---   option 0 (preamble <* crlf)
-  body <- boundaryParser *> (bodyPart boundaryParser <?> "invalid bodyPart") -- <* many (encapsulation boundaryParser)
-  closeDelimiter boundaryParser >> transportPadding
---  option 0 (crlf *> epilogue)
-  return body
+multipartBody :: ByteString -> Parser [R5322.Message]
+multipartBody str = do
+  let sep = dashBoundary str *> transportPadding
+  manyTill octet (sep *> crlf)
+  xs <- many (parseTill bodyPart $ sep <* crlf)
+  x <- parseTill bodyPart $ sep <* "--"
+  return $ xs ++ [x]
 
+-- multipartBody2 ::ByteString -> Parser [R5322.Message]
+-- multipartBody2 str = do
+--   let sep = dashBoundary str *> transportPadding
+--   sep <|> bodyPart
 -- mimeBoundary :: Maybe ByteString -> Parser ByteString
 -- mimeBoundary Nothing = pack <$> (AC.string "--" *> manyNtoM 0 69 bchars)
 -- mimeBoundary (Just s) = AC.string ("--" <> s) <* skipMany (AC.char '-')
+
+-- | delimit this parser to a fixed byte in order to close dos attacks
+parseTill :: Parser a -> Parser b -> Parser a
+parseTill p end = do
+  ds <- pack <$> manyTill octet end
+  case parseOnly p ds of
+    Left err  -> fail err
+    Right ret -> return ret
+
 

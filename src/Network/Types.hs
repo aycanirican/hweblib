@@ -3,14 +3,11 @@
 {-# LANGUAGE OverloadedStrings  #-}
 module Network.Types
        ( -- * HTTP Types
-         Method(..)
-       , HTTPVersion(..)
+         HTTPVersion(..)
        , http10
        , http11
        , Headers(..)
        , RequestUri(..)
-       , Request(..)
-       , Response(..)
        , URI(..)
        , URIAuth(..)
 
@@ -19,11 +16,11 @@ module Network.Types
 
        ) where
 --------------------------------------------------------------------------------
-import           Control.Exception     as Ex
-import           Data.ByteString.Char8 as C
+import           Control.Exception
+import           Data.ByteString.Char8
+import           Data.Monoid
 import           Data.Time
 import           Data.Typeable
--- import           Generics.SOP
 import qualified GHC.Generics          as GHC
 --------------------------------------------------------------------------------
 -- | HTTP Version holds major and minor numbers.
@@ -55,79 +52,79 @@ type Headers = [(ByteString, ByteString)]
 --             , requestHeaders :: RequestHeaders
 --             , generalHeaders :: GeneralHeaders
 --             } deriving (Eq, Show)
-data EH = Allow ByteString
-        | Expires UTCTime
-        | ContentLength Int
-        | ContentLanguage ByteString
-          deriving (Eq, Show, GHC.Generic)
+-- data EH = Allow ByteString
+--         | Expires UTCTime
+--         | ContentLength Int
+--         | ContentLanguage ByteString
+--           deriving (Eq, Show, GHC.Generic)
 
-data EntityHeaders
-  =  EntityHeaders { ehAllow           :: Maybe ByteString
-                   , ehContentEncoding :: Maybe ByteString
-                   , ehContentLanguage :: Maybe ByteString
-                   , ehContentLength   :: Maybe Int
-                   , ehContentLocation :: Maybe ByteString
-                   , ehContentMD5      :: Maybe ByteString
-                   , ehContentRange    :: Maybe ByteString
-                   , ehContentType     :: Maybe ByteString
-                   , ehExpires         :: Maybe UTCTime
-                   , ehLastModified    :: Maybe UTCTime
-                   } deriving (Eq, Show)
+-- data EntityHeaders
+--   =  EntityHeaders { ehAllow           :: Maybe ByteString
+--                    , ehContentEncoding :: Maybe ByteString
+--                    , ehContentLanguage :: Maybe ByteString
+--                    , ehContentLength   :: Maybe Int
+--                    , ehContentLocation :: Maybe ByteString
+--                    , ehContentMD5      :: Maybe ByteString
+--                    , ehContentRange    :: Maybe ByteString
+--                    , ehContentType     :: Maybe ByteString
+--                    , ehExpires         :: Maybe UTCTime
+--                    , ehLastModified    :: Maybe UTCTime
+--                    } deriving (Eq, Show)
 
-data RequestHeaders
-  = RequestHeaders { rhAccept             :: Maybe ByteString
-                   , rhAcceptCharset      :: Maybe ByteString
-                   , rhAcceptEncoding     :: Maybe ByteString
-                   , rhAcceptLanguage     :: Maybe ByteString
-                   , rhAuthorization      :: Maybe ByteString
-                   , rhExpect             :: Maybe ByteString
-                   , rhFrom               :: Maybe ByteString
-                   , rhHost               :: Maybe ByteString
-                   , rhIfMatch            :: Maybe ByteString
-                   , rhIfModifiedSince    :: Maybe UTCTime
-                   , rhIfNoneMatch        :: Maybe ByteString
-                   , rhIfRange            :: Maybe ByteString
-                   , rhIfUnmodifiedSince  :: Maybe UTCTime
-                   , rhMaxForwards        :: Maybe ByteString
-                   , rhProxyAuthorization :: Maybe ByteString
-                   , rhRange              :: Maybe ByteString
-                   , rhReferrer           :: Maybe ByteString
-                   , rhTe                 :: Maybe ByteString
-                   , rhUserAgent          :: Maybe ByteString
-                   , rhCookie             :: Maybe ByteString
-                   } deriving (Eq, Show)
+-- data RequestHeaders
+--   = RequestHeaders { rhAccept             :: Maybe ByteString
+--                    , rhAcceptCharset      :: Maybe ByteString
+--                    , rhAcceptEncoding     :: Maybe ByteString
+--                    , rhAcceptLanguage     :: Maybe ByteString
+--                    , rhAuthorization      :: Maybe ByteString
+--                    , rhExpect             :: Maybe ByteString
+--                    , rhFrom               :: Maybe ByteString
+--                    , rhHost               :: Maybe ByteString
+--                    , rhIfMatch            :: Maybe ByteString
+--                    , rhIfModifiedSince    :: Maybe UTCTime
+--                    , rhIfNoneMatch        :: Maybe ByteString
+--                    , rhIfRange            :: Maybe ByteString
+--                    , rhIfUnmodifiedSince  :: Maybe UTCTime
+--                    , rhMaxForwards        :: Maybe ByteString
+--                    , rhProxyAuthorization :: Maybe ByteString
+--                    , rhRange              :: Maybe ByteString
+--                    , rhReferrer           :: Maybe ByteString
+--                    , rhTe                 :: Maybe ByteString
+--                    , rhUserAgent          :: Maybe ByteString
+--                    , rhCookie             :: Maybe ByteString
+--                    } deriving (Eq, Show)
 
-data GeneralHeaders
-  = GeneralHeaders { ghCacheControl     :: Maybe ByteString
-                   , ghConnection       :: Maybe ByteString
-                   , ghDate             :: Maybe UTCTime
-                   , ghPragma           :: Maybe ByteString
-                   , ghTrailer          :: Maybe ByteString
-                   , ghTransferEncoding :: Maybe ByteString
-                   , ghUpgrade          :: Maybe ByteString
-                   , ghVia              :: Maybe ByteString
-                   , ghWarning          :: Maybe ByteString
-                   }  deriving (Eq, Show)
+-- data GeneralHeaders
+--   = GeneralHeaders { ghCacheControl     :: Maybe ByteString
+--                    , ghConnection       :: Maybe ByteString
+--                    , ghDate             :: Maybe UTCTime
+--                    , ghPragma           :: Maybe ByteString
+--                    , ghTrailer          :: Maybe ByteString
+--                    , ghTransferEncoding :: Maybe ByteString
+--                    , ghUpgrade          :: Maybe ByteString
+--                    , ghVia              :: Maybe ByteString
+--                    , ghWarning          :: Maybe ByteString
+--                    }  deriving (Eq, Show)
 
--- | HTTP Methods
-data Method = GET
-            | HEAD
-            | POST
-            | PUT
-            | DELETE
-            | TRACE
-            | OPTIONS
-            | CONNECT
-            | EXTENSIONMETHOD ByteString
-              deriving (Eq, Show)
+-- -- | HTTP Methods
+-- data Method = GET
+--             | HEAD
+--             | POST
+--             | PUT
+--             | DELETE
+--             | TRACE
+--             | OPTIONS
+--             | CONNECT
+--             | EXTENSIONMETHOD ByteString
+--               deriving (Eq, Show)
 
-data Request
-  = Request { rqMethod  :: Method                     -- ^ Request Method
-            , rqUri     :: RequestUri                 -- ^ Request URI
-            , rqVersion :: HTTPVersion                -- ^ HTTP Version as a tuple
-            , rqHeaders :: Headers                    -- ^ HTTP Message Headers
-            , rqBody    :: ByteString                 -- ^ Request Body
-            } deriving (Eq, Show)
+-- data Request
+--   = Request { rqMethod  :: Method                     -- ^ Request Method
+--             , rqUri     :: RequestUri                 -- ^ Request URI
+--             , rqVersion :: HTTPVersion                -- ^ HTTP Version as a tuple
+--             , rqHeaders :: Headers                    -- ^ HTTP Message Headers
+--             , rqBody    :: ByteString                 -- ^ Request Body
+--             } deriving (Eq, Show)
 
 data RequestUri
   = Asterisk                  -- ^ like in OPTIONS * HTTP/1.1
@@ -137,13 +134,13 @@ data RequestUri
   | Authority (Maybe URIAuth) -- ^ Just the authority part
     deriving (Eq, Show)
 
-data Response =
-  Response {
-      rpCode    :: Int                        -- ^ Response Code
-    , rpHeaders :: Headers                    -- ^ Response Headers
-    , rpVersion :: HTTPVersion                -- ^ HTTP Version
-    , rpMessage :: ByteString                 -- ^ Response Message
-  } deriving (Eq, Show)
+-- data Response =
+--   Response {
+--       rpCode    :: Int                        -- ^ Response Code
+--     , rpHeaders :: Headers                    -- ^ Response Headers
+--     , rpVersion :: HTTPVersion                -- ^ HTTP Version
+--     , rpMessage :: ByteString                 -- ^ Response Message
+--   } deriving (Eq, Show)
 
 data URI = URI
     { uriScheme    :: ByteString    -- ^ Ex: http or https

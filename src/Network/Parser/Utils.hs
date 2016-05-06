@@ -1,0 +1,38 @@
+module Network.Parser.Utils
+       where
+
+--
+-- Module      :  Network.Parser.Utils
+-- Copyright   :  Aycan iRiCAN, Utku Demir 2010-2015
+-- License     :  BSD3
+--
+-- Maintainer  :  iricanaycan@gmail.com
+-- Stability   :  experimental
+-- Portability :  unknown
+--
+-- Common Utilities for Parsers
+
+--------------------------------------------------------------------------------
+import           Control.Applicative
+import           Data.Attoparsec.ByteString
+import           Data.Attoparsec.ByteString.Char8
+import           Data.Char
+--------------------------------------------------------------------------------
+
+-- * Common Parsing Utilities
+
+-- | Parse `n` digit as `Int` validated by `p`
+nDigitInt :: Int -> (Int -> Bool) -> Parser Int
+nDigitInt n p = do
+  xs <- count n digit
+  let conv = sum . fmap (uncurry (*))
+             . Prelude.zip [10^x| x <- Prelude.reverse [0..(n-1)]]
+             . fmap digitToInt
+      x    = conv xs
+  if p x then return x else fail "Invalid Integer"
+
+-- | Parse `p` at max `n` times
+maxP :: Int -> Parser a -> Parser [a]
+maxP 0 p = return mempty
+maxP n p = ((:) <$> p <*> maxP (n-1) p) <|> return mempty
+

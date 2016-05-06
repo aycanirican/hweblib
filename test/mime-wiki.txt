@@ -1,5 +1,5 @@
 MIME-Version: 1.0
-Content-Type: multipart/mixed; boundary="frontier" 
+Content-Type: multipart/mixed; boundary="frontier"
 
 This is a message with multiple parts in MIME format.
 --frontier

@@ -9,7 +9,7 @@ Description:
 Homepage:            http://github.com/aycanirican/hweblib
 License:             BSD3
 License-file:        LICENSE
-Author:              Aycan iRiCAN
+Author:              Aycan iRiCAN <iricanaycan@gmail.com>, Uktu Demir <utdemir@gmail.com>
 Maintainer:          iricanaycan@gmail.com
 Category:            Web
 Build-type:          Simple
@@ -32,10 +32,15 @@ Library
                  , Network.Parser.Rfc2234
                  , Network.Parser.Rfc2388
                  , Network.Parser.Rfc2822
+                 , Network.Parser.Rfc4647
                  , Network.Parser.Rfc5234
                  , Network.Parser.Rfc3986
                  , Network.Parser.Rfc5322
                  , Network.Parser.Rfc7230
+                 , Network.Parser.Rfc7231
+                 , Network.Parser.Rfc7232
+                 , Network.Parser.Rfc7233
+                 , Network.Parser.Rfc7234
                  , Network.Parser.Mime
 
   -- Packages needed in order to build this package.

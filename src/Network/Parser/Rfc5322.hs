@@ -29,6 +29,7 @@ import           Data.Time
 import           Data.Word                        (Word8)
 import           Prelude                          hiding (id, take, takeWhile)
 --------------------------------------------------------------------------------
+import           Network.Parser.Rfc2822           (quoted_string)
 import           Network.Parser.Rfc5234
 import           Network.Parser.RfcCommon         hiding (ctext, text)
 --------------------------------------------------------------------------------
@@ -117,7 +118,7 @@ cfws = BSC.concat <$> (many1 (option mempty fws *> comment) <* option mempty fws
 -- | * 3.2.3. Atom
 atext :: Parser Word8
 atext = alpha <|> digit <|> satisfy pred
-  where pred = inClass "!#$%&'*+-/=?^_`{|}~"
+  where pred = inClass "!#$%&'*+/=?^_`{|}~-"
 
 atom :: Parser ByteString
 atom = ocfws *> (pack <$> many1 atext) <* ocfws
@@ -147,16 +148,6 @@ qtext = satisfy pred
 qcontent :: Parser ByteString
 qcontent = pack <$> (asList qtext <|> quotedPair)
 
--- >>> parse quoted_string "\"asd is my foo\"\n\n"
--- Done "\n\n" "\"asd is my foo\""
-quoted_string :: Parser ByteString
-quoted_string = do
-  ocfws
-  dquote
-  r1 <- (many ((<>) <$> option mempty fws <*> qcontent) <* option mempty fws)
-  dquote
-  ocfws
-  return ("\"" <> BSC.concat r1 <> "\"")
 -- | * 3.2.5.  Miscellaneous Tokens
 word :: Parser ByteString
 word = atom <|> quoted_string
@@ -276,9 +267,9 @@ timeOfDay = do
   return $ TimeOfDay h m (fromInteger $ toInteger s)
 
 hour, minute, second :: Parser Int
-hour   = twoDigitInt (\x -> (0 <= x) && x <= 60)
-minute = twoDigitInt (\x -> (0 <= x) && x <= 60)
-second = twoDigitInt (\x -> (0 <= x) && x <= 60)
+hour   = twoDigitInt (\x -> (0 <= x) && x <= 23)
+minute = twoDigitInt (\x -> (0 <= x) && x <= 59)
+second = twoDigitInt (\x -> (0 <= x) && x <= 59)
 
 -- >>> parseOnly zone "-0200"
 -- Right -0200
@@ -350,13 +341,15 @@ dtext = satisfy pred
   where pred w = (w>=33 && w<=90) || (w>=94 && w<= 126)
 
 -- 3.5.  Overall Message Syntax
-
+-- >>> parse message "Content-Type: text/plain\n\nThis is a multi\nline message.\n\0"
 message :: Parser Message
-message = Message <$> fields <*> (option Nothing (Just <$> (crlf *> body)))
+message = Message <$> (fields <* crlf) <*> (option Nothing (Just <$> body))
 
 -- (*(*998text CRLF) *998text)
+-- >>> parse body "asdasd\nasdasd\n\0"
+-- Done "\NUL" "asdasd\nasdasd\n"
 body :: Parser ByteString
-body = BSC.concat <$> (text998 `sepBy` crlf)
+body = BSC.intercalate "\n" <$> (text998 `sepBy` crlf)
 
 text998 :: Parser ByteString
 text998 = textMax 998
