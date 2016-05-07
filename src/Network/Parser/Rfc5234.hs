@@ -103,6 +103,7 @@ crlf = return 10 <$> (try (cr *> lf) <|> lf)
 {-# INLINABLE crlf #-}
 
 -- | Parse CR
+crPred :: Word8 -> Bool
 crPred = (== 0x0d)
 cr :: Parser Word8
 cr = satisfy crPred <?> "carriage return"

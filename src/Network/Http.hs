@@ -6,23 +6,18 @@ module Network.Http
 --------------------------------------------------------------------------------
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.IO.Class
 import           Data.Attoparsec.ByteString
 import           Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString                  hiding (elem, foldl')
 import           Data.List
 import qualified Data.Map.Strict                  as M
-import           Debug.Trace
-import           Network.Parser.Mime
-import           Network.Parser.Permute
+--------------------------------------------------------------------------------
 import qualified Network.Parser.Rfc2045           as R2045
 import qualified Network.Parser.Rfc2046           as R2046
 import qualified Network.Parser.Rfc5234           as R5234
 import qualified Network.Parser.Rfc5322           as R5322
 import qualified Network.Parser.Rfc7230           as R7230
 import qualified Network.Parser.Rfc7231           as R7231
-import qualified Network.Parser.Rfc7234           as R7234
-import           Network.Types
 --------------------------------------------------------------------------------
 
 -- contentType :: Request -> Maybe ByteString
@@ -110,7 +105,7 @@ parseMessage = do
             <|> (\i h -> h { otherHeaders = i : otherHeaders h } )
                   <$> R7230.header_field <* R5234.crlf
   let hs = foldl' (flip ($)) emptyHTTPHeaders fs
-  R5234.crlf
+  _ <- R5234.crlf
 
   body <- case contentType hs of
     Just (R7231.MediaType "multipart" subtype xs) -> case "boundary" `lookup` xs of
@@ -136,7 +131,7 @@ hasHeader rq key = lookup key (R7230.headers rq)
 mimes :: Parser [R5322.Message]
 mimes = do
   ehdrs <- R2045.entityHeaders <* R5234.crlf
-  case contentType ehdrs of
+  case cType ehdrs of
     Nothing       -> fail "No content-type defined in entity headers"
     Just (ty, hs) ->
       if (ty `elem` ["multipart/mixed", "multipart/alternative"])
@@ -145,10 +140,10 @@ mimes = do
              Just b  -> (R2046.multipartBody b)
       else case M.lookup "boundary" hs of
              Nothing -> pure []
-             Just b  -> R7230.asList R2046.bodyPart
+             Just _  -> R7230.asList R2046.bodyPart
   where
-    contentType :: [R2045.Header] -> Maybe (ByteString, (M.Map ByteString ByteString))
-    contentType headers
+    cType :: [R2045.Header] -> Maybe (ByteString, (M.Map ByteString ByteString))
+    cType headers
       = let chs = Prelude.filter ((== R2045.ContentH) . R2045.hType) headers
         in case chs of
         []  -> Nothing

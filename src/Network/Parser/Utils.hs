@@ -26,13 +26,13 @@ nDigitInt :: Int -> (Int -> Bool) -> Parser Int
 nDigitInt n p = do
   xs <- count n digit
   let conv = sum . fmap (uncurry (*))
-             . Prelude.zip [10^x| x <- Prelude.reverse [0..(n-1)]]
+             . Prelude.zip [10^i| i <- Prelude.reverse [0..(n-1)]]
              . fmap digitToInt
       x    = conv xs
   if p x then return x else fail "Invalid Integer"
 
 -- | Parse `p` at max `n` times
 maxP :: Int -> Parser a -> Parser [a]
-maxP 0 p = return empty
+maxP 0 _ = return empty
 maxP n p = ((:) <$> p <*> maxP (n-1) p) <|> return empty
 

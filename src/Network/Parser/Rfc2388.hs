@@ -16,19 +16,12 @@
 module Network.Parser.Rfc2388 where
 --------------------------------------------------------------------------------
 import           Control.Applicative
-import           Control.Monad                    (join)
 import           Data.Attoparsec.ByteString
-import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString
-import qualified Data.ByteString.Char8            as C
-import           Data.Map.Strict                  as M
-import           Data.Word                        (Word8)
+import           Data.Attoparsec.ByteString.Char8 (char, stringCI)
 --------------------------------------------------------------------------------
 import           Network.Parser.Mime
 import qualified Network.Parser.Rfc2183           as R2183
-import           Network.Parser.Rfc2234
-import           Network.Parser.Rfc2822           (comment, msg_id, text)
-import           Network.Parser.RfcCommon         hiding (text)
+import           Network.Parser.Rfc2234           hiding (char)
 --------------------------------------------------------------------------------
 
 -- | 3. Definition of multipart/form-data
@@ -37,13 +30,13 @@ import           Network.Parser.RfcCommon         hiding (text)
 -- Right (Disposition {dispType = DispFormData, dispParams = [OtherParam "name" "user"]})
 disposition :: Parser Disposition
 disposition
-  = do AC.string "Content-Disposition:" >> lwsp
-       (ty, xs) <- (,) <$> dispositionType <*> many (AC.char ';' >> lwsp *> R2183.dispositionParam)
+  = do _ <- stringCI "Content-Disposition:" >> lwsp
+       (ty, xs) <- (,) <$> dispositionType <*> many (char ';' >> lwsp *> R2183.dispositionParam)
        return $ Disposition ty xs
 
 dispositionType :: Parser DispType
 dispositionType
   =   R2183.dispositionType
-  <|> AC.stringCI "form-data" *> return DispFormData
+  <|> stringCI "form-data" *> return DispFormData
 
 

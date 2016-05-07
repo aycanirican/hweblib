@@ -22,11 +22,11 @@ import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString                  hiding (count)
 import qualified Data.ByteString.Char8            as BSC
-import           Data.ByteString.Internal         (c2w)
+
 import           Data.Monoid
 import           Data.Scientific
-import qualified Data.Text                        as T
-import qualified Data.Text.Encoding               as T
+
+
 import           Data.Typeable
 import           Data.Word                        (Word8)
 import           GHC.Generics                     (Generic)
@@ -103,8 +103,7 @@ http_version
 http_message :: Parser HTTPMessage
 http_message = do
   sl <- start_line
-  xs <- many (header_field <* crlf)
-  crlf
+  xs <- many (header_field <* crlf) <* crlf
   return $ HTTPMessage sl xs mempty
 
 -- 2.7.  Uniform Resource Identifiers
@@ -178,18 +177,18 @@ token :: Parser ByteString
 token = pack <$> many1 tchar
 
 tchar :: Parser Word8
-tchar = satisfy pred <|> digit <|> alpha
-  where pred = inClass "!#$%&'*+.^_`|~-"
+tchar = satisfy p <|> digit <|> alpha
+  where p = inClass "!#$%&'*+.^_`|~-"
 
 quoted_string :: Parser ByteString
 quoted_string = pack . join <$> (dquote *> many (asList qdtext <|> quoted_pair) <* dquote)
 
 qdtext :: Parser Word8
-qdtext = htab <|> sp <|> satisfy pred <|> obs_text
+qdtext = htab <|> sp <|> satisfy p <|> obs_text
   where
-    pred w = w == 0x21
-             || (w >= 0x23 && w <= 0x5b)
-             || (w >= 0x5d && w <= 0x7e)
+    p w = w == 0x21
+          || (w >= 0x23 && w <= 0x5b)
+          || (w >= 0x5d && w <= 0x7e)
 
 obs_text :: Parser Word8
 obs_text = satisfy (\w -> w >= 0x80 && w <= 0xff)
@@ -203,10 +202,10 @@ comment = ret <$> (   word8 40
   where ret x = "(" <> BSC.concat x <> ")"
 
 ctext :: Parser Word8
-ctext = htab <|> sp <|> satisfy pred <|> obs_text
-  where pred w = (w >= 0x21 && w <= 0x27)
-                 || (w >= 0x2a && w <= 0x5b)
-                 || (w >= 0x5d && w <= 0x7e)
+ctext = htab <|> sp <|> satisfy p <|> obs_text
+  where p w = (w >= 0x21 && w <= 0x27)
+              || (w >= 0x2a && w <= 0x5b)
+              || (w >= 0x5d && w <= 0x7e)
 
 quoted_pair :: Parser [Word8]
 quoted_pair = (\a b -> a:b:[]) <$> word8 92 <*> (htab <|> sp <|> vchar <|> obs_text)
@@ -216,6 +215,7 @@ message_body :: Parser ByteString
 message_body = pack <$> many octet
 
 -- 3.3.1.  Transfer-Encoding
+transfer_encoding :: Parser [TransferCoding]
 transfer_encoding = dash1 transfer_coding
 
 -- 3.3.2.  Content-Length
@@ -244,6 +244,7 @@ transfer_parameter = (,) <$> (token <* bws <* AC.char '=') <*> (bws *> (token <|
 chunked_body :: Parser ChunkedBody
 chunked_body = ChunkedBody <$> (manyTill chunk last_chunk) <*> (trailer_part <* crlf)
 
+chunk :: Parser Chunk
 chunk = do
   n <- chunk_size
   ext <- option [] chunk_ext <* crlf
@@ -305,9 +306,11 @@ rank = (AC.char '0' *> option 0 prec)
         Right sci -> return sci
 
 -- 4.4.  Trailer
+trailer :: Parser [ByteString]
 trailer = dash1 field_name
 
 -- 5.3.  Request Target
+request_target :: Parser RequestTarget
 request_target
   =     absolute_form
     <|> (const AsteriskForm  <$> asterisk_form)
@@ -334,7 +337,9 @@ asterisk_form = AC.char '*' >> return AsteriskForm
 host :: Parser (ByteString, Maybe ByteString)
 host = (,) <$> uri_host <*> option Nothing (Just <$> (AC.char ':' *> port))
 
+port :: Parser ByteString
 port = R3986.port
+uri_host :: Parser ByteString
 uri_host = R3986.host
 
 -- 5.7.  Message Forwarding
@@ -407,13 +412,13 @@ dash1 :: Parser a -> Parser [a]
 dash1 = dashN 1
 
 dashN :: Int -> Parser a -> Parser [a]
-dashN 0 p = return []
+dashN 0 _ = return []
 dashN n p
   | n == 0    = return []
   | otherwise = (\a b c -> a:(b++c)) <$> p
                                      <*> count (n-1) (addSep p)
                                      <*> many        (addSep p)
-  where addSep p = ows *> word8 44 *> ows *> p
+  where addSep x = ows *> word8 44 *> ows *> x
 
 dashNtoM :: Int -> Int -> Parser a -> Parser [a]
 dashNtoM n m p
@@ -427,11 +432,11 @@ dashNtoM n m p
 
 -- | Parse `n` times separated by `s`
 sepByN :: Int -> Parser a -> Parser () -> Parser [a]
-sepByN 0 p s = return mempty
+sepByN 0 _ _ = return mempty
 sepByN n p s = (:) <$> p <*> count (n-1) (s *> p)
 
 sepByMaxN :: Int -> Parser a -> Parser () -> Parser [a]
-sepByMaxN 0 p s = return mempty
+sepByMaxN 0 _ _ = return mempty
 sepByMaxN n p s = ((:) <$> p <*> maxP (n-1) (s *> p)) <|> return mempty
 
 -- dashNtoM :: Parser a -> Parser [a]

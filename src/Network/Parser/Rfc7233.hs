@@ -21,11 +21,7 @@ module Network.Parser.Rfc7233 where
 import           Control.Applicative
 import           Data.Attoparsec.ByteString       as BS
 import           Data.Attoparsec.ByteString.Char8 as AC
-import           Data.Attoparsec.Combinator
 import           Data.ByteString
-import           Data.Char                        (digitToInt)
-import           Data.Monoid
-import           Data.Scientific
 import           Data.Time
 import           Data.Typeable
 import qualified GHC.Generics                     as GHC
@@ -112,7 +108,7 @@ other_range_set = pack <$> many1 R2234.vchar
 {-
 If-Range = entity-tag / HTTP-date
 -}
-
+if_range :: Parser (Either ByteString UTCTime)
 if_range = (Left <$> entity_tag) <|> (Right <$> http_date)
 
 -- * 4.2.  Content-Range

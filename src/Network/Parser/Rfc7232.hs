@@ -20,12 +20,12 @@ import           Data.Attoparsec.ByteString       as A
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString
 import           Data.Monoid
+import           Data.Time
 import           Data.Word
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc5234           (dquote)
 import           Network.Parser.Rfc7230
 import           Network.Parser.Rfc7231
-import           Network.Types
 --------------------------------------------------------------------------------
 
 {- Appendix C.  Collected ABNF
@@ -59,7 +59,7 @@ import           Network.Types
 -}
 
 -- * 2.2.  Last-Modified
-
+last_modified :: Parser UTCTime
 last_modified = http_date
 
 -- * 2.3.  ETag
@@ -96,12 +96,15 @@ if_match :: Parser (Either Star [ByteString])
 if_match = A.eitherP (AC.char '*' *> pure Star) (dash1 entity_tag)
 
 -- * 3.2.  If-None-Match
+if_none_match :: Parser (Either Star [ByteString])
 if_none_match = if_match
 
 -- * 3.3.  If-Modified-Since
+if_modified_since :: Parser UTCTime
 if_modified_since = http_date
 
 -- * 3.4.  If-Unmodified-Since
+if_unmodified_since :: Parser UTCTime
 if_unmodified_since = http_date
 
 -- * 3.5.  If-Range

@@ -19,7 +19,6 @@ import           Control.Applicative
 import           Control.Monad
 import           Data.Attoparsec.ByteString       as A
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.Attoparsec.Combinator
 import           Data.ByteString                  as B hiding (count, singleton)
 import           Data.Monoid
 import           Data.Word

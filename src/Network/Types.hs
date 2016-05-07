@@ -6,7 +6,7 @@ module Network.Types
          HTTPVersion(..)
        , http10
        , http11
-       , Headers(..)
+       , Headers
        , RequestUri(..)
        , URI(..)
        , URIAuth(..)
@@ -18,8 +18,6 @@ module Network.Types
 --------------------------------------------------------------------------------
 import           Control.Exception
 import           Data.ByteString.Char8
-import           Data.Monoid
-import           Data.Time
 import           Data.Typeable
 import qualified GHC.Generics          as GHC
 --------------------------------------------------------------------------------
@@ -156,15 +154,6 @@ data URIAuth = URIAuth
     , uriRegName  :: ByteString  -- ^ registered name, ex: www.core.gen.tr
     , uriPort     :: ByteString  -- ^ Port as a string
     } deriving (Eq, Show)
-
-nullURI :: URI
-nullURI = URI
-    { uriScheme     = mempty
-    , uriAuthority  = Nothing
-    , uriPath       = mempty
-    , uriQuery      = mempty
-    , uriFragment   = mempty
-    }
 
 -- | HTTP error.
 data HttpError

@@ -20,16 +20,12 @@ import           Control.Monad
 import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString
-import qualified Data.ByteString.Char8            as C
-import           Data.Char                        (digitToInt, isAsciiLower,
-                                                   isAsciiUpper)
-import           Data.List                        (concat)
-import           Data.Monoid
-import           Data.Word                        (Word64, Word8)
+import qualified Data.ByteString.Char8            as BSC
+import           Data.Monoid                      ((<>))
+import           Data.Word                        (Word8)
 import           Prelude                          hiding (take, takeWhile)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
-import qualified Network.Parser.RfcCommon         as RC
 import           Network.Types
 --------------------------------------------------------------------------------
 
@@ -91,30 +87,32 @@ pathAbsolute = ("/" <>) <$> (word8 47 *> option mempty pathRootless)
 pathAbempty :: Parser ByteString
 pathAbempty = pack . join <$> many slashSegment
 
-regName = many' (unreserved <|> pctEncoded <|> subDelims)
+regName :: Parser ByteString
+regName = pack <$> many (unreserved <|> pctEncoded <|> subDelims)
 
-decOctet :: Parser [Word8]
-decOctet = do
-  x <- many' digit
-  if read (C.unpack . pack $ x) > 255
-    then fail "error decOctet"
-    else return x
+decOctet :: Parser ByteString
+decOctet = pack . ret <$> many1 digit
+  where
+    ret :: [Word8] -> [Word8]
+    ret x = if read (BSC.unpack . pack $ x) > (255 :: Int)
+            then fail "wrong decOctet"
+            else x
 
-ipv4address :: Parser [Word8]
-ipv4address = ret <$> decOctet <* word8 46
-                  <*> decOctet <* word8 46
-                  <*> decOctet <* word8 46
-                  <*> decOctet
-  where ret a b c d = a++[46]++b++[46]++c++[46]++d
+
+ipv4address :: Parser ByteString
+ipv4address = fst <$> match (decOctet >> "."
+                             >> decOctet >> "."
+                             >> decOctet >> "."
+                             >> decOctet)
 
 port :: Parser ByteString
-port = pack <$> many' digit
+port = pack <$> many digit
 
 -- TODO: IP-literal
 -- host = ipLiteral <|> ipv4address <|> regName
 
 host :: Parser ByteString
-host = pack <$> (regName <|> ipv4address)
+host = regName <|> ipv4address
 
 userinfo :: Parser ByteString
 userinfo = pack <$> many (unreserved <|> pctEncoded <|> subDelims <|> word8 58) <* word8 64
@@ -141,6 +139,7 @@ relativePart = ((,) <$> (word8 47 *> word8 47 *> option Nothing authority)
                <|> ((Nothing,) <$> pathNoscheme)
                <|> pure (Nothing, mempty)
 
+relativeRef :: Parser URI
 relativeRef = do
   (ua,up) <- relativePart
   uq <- option mempty (word8 63 *> query)
@@ -153,7 +152,7 @@ relativeRef = do
              }
 
 hierPart :: Parser (Maybe URIAuth, ByteString)
-hierPart = do try (word8 47 *> word8 47)
+hierPart = do _  <- try (word8 47 *> word8 47)
               uu <- option Nothing authority
               pa <- pathAbempty
               return (uu,pa)
@@ -164,7 +163,7 @@ hierPart = do try (word8 47 *> word8 47)
 absoluteUri :: Parser URI
 absoluteUri = do
   us <- scheme
-  word8 58
+  _ <- word8 58
   (ua,up) <- hierPart
   uq <- option mempty (word8 63 *> query)
   return URI { uriScheme = us
@@ -174,9 +173,10 @@ absoluteUri = do
              , uriFragment = mempty
              }
 
+uri :: Parser URI
 uri = do
   us <- scheme
-  word8 58
+  _ <- word8 58
   (ua,up) <- hierPart
   uq <- option mempty (word8 63 *> query)
   uf <- option mempty (word8 35 *> fragment)
@@ -188,4 +188,5 @@ uri = do
          , uriFragment = uf
          }
 
+uriReference :: Parser URI
 uriReference = uri <|> relativeRef

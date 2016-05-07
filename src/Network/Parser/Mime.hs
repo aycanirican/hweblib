@@ -26,7 +26,6 @@ import           Data.Time
 import           Prelude                    hiding (take, takeWhile)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2045
-import           Network.Parser.Rfc2046
 --------------------------------------------------------------------------------
 
 
@@ -37,13 +36,13 @@ import           Network.Parser.Rfc2046
 string2mimetype :: ByteString -> MimeType
 string2mimetype s =
     case paired s of
-      ("text", s) -> Text s
-      ("image", s) -> Image s
-      ("audio", s) -> Audio s
-      ("video", s) -> Video s
-      ("application", s) -> Application s
-      ("message", s) -> Message s
-      ("multipart", s) ->
+      ("text", x) -> Text x
+      ("image", x) -> Image x
+      ("audio", x) -> Audio x
+      ("video", x) -> Video x
+      ("application", x) -> Application x
+      ("message", x) -> Message x
+      ("multipart", x) ->
           case s of
             "alternative" -> MultiPart Alternative
             "byteranges" -> MultiPart Byteranges
@@ -54,10 +53,10 @@ string2mimetype s =
             "parallel" -> MultiPart Parallel
             "related" -> MultiPart Related
             "signed" -> MultiPart Signed
-            _ -> MultiPart (Extension s)
-      (t, s) -> Other t s
+            _ -> MultiPart (Extension x)
+      (t, x) -> Other t x
     where
-      paired s = let (a,b) = (T.break (== '/') . T.toLower . decodeLatin1) s in
+      paired x = let (a,b) = (T.break (== '/') . T.toLower . decodeLatin1) x in
                  (a, T.drop 1 b)
 
 -- Parse headers and map them to a MimeValue

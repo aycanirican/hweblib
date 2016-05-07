@@ -18,13 +18,10 @@ import           Control.Applicative
 import           Control.Monad                    (join)
 import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.Attoparsec.Combinator
 import           Data.ByteString                  as B (ByteString, concat,
-                                                        intercalate, pack,
-                                                        readFile)
+                                                        intercalate, pack)
 import qualified Data.ByteString.Char8            as BSC
 import           Data.Char                        (digitToInt)
-import           Data.Fixed                       (Fixed (MkFixed))
 import           Data.List                        as L (concat, intercalate)
 import           Data.Maybe                       (catMaybes)
 import           Data.Monoid
@@ -42,14 +39,18 @@ header :: ByteString -> Parser a -> Parser a
 header key p = AC.stringCI (key <> ":") *> p <* crlf
 
 -- ** 3.2.1. Primitive Tokens
+no_ws_ctlPred :: Word8 -> Bool
 no_ws_ctlPred w
   = (w >= 1 && w <= 8)
     || (w == 11) || (w == 12)
     || (w <= 14 && w >= 31)
     || w == 127
+
+no_ws_ctl :: Parser Word8
 no_ws_ctl = satisfy no_ws_ctlPred
 
 -- | Parse a text element and return corresponding Word8
+text :: Parser Word8
 text = satisfy $ \w ->
        (w >= 1 && w<=9)
        || w == 11
@@ -88,20 +89,26 @@ ctext = no_ws_ctl <|> satisfy rest
 -- Parse a comment
 comment :: Parser ByteString
 comment = do
-  word8 40
+  _ <- word8 40
   r1 <- many (option [] fws *> ccontent)
   r2 <- pack <$> option [] fws
-  word8 41
+  _ <- word8 41
   return $ "(" <> B.concat r1 <> r2 <> ")"
     where
       ccontent :: Parser ByteString
       ccontent = choice [(pack <$> many1 ctext), pack <$> quotedPair, comment]
 
+cfws :: Parser ByteString
 cfws = B.concat <$> many1 (choice [pack <$> fws, comment])
+
+ocfws :: Parser ByteString
 ocfws = option mempty cfws
 
 -- | * 3.2.4. Atom
+atextPred :: Word8 -> Bool
 atextPred w = charPred w && not (ctlPred w || spPred w || specialsPred w)
+
+atext :: Parser Word8
 atext = satisfy atextPred
 
 atom :: Parser ByteString
@@ -132,11 +139,9 @@ qcontent = option mempty (pack <$> asList qtext) <|> (pack <$> quotedPair)
 -- Just "foobar"
 quoted_string :: Parser ByteString
 quoted_string = do
-  ocfws
-  dquote
+  _ <- ocfws >> dquote
   r1 <- B.concat <$> (many1 (option [] fws *> qcontent) <|> option [" "] ((:[]) . pack <$> fws))
-  dquote
-  ocfws
+  _ <- dquote >> ocfws
   return r1
 
 -- | * 3.2.6. Miscellaneous tokens
@@ -151,6 +156,7 @@ utext = no_ws_ctl <|> satisfy (\w -> w>=33 && w<=126)
 
 -- >>> parseOnly unstructured "  a b c \n"
 -- Right " a b c "
+unstructured :: Parser ByteString
 unstructured = pack <$> do
   r1 <- option [] fws
   r2 <- many ((:) <$> utext <*> option [] fws)
@@ -191,7 +197,7 @@ twoDigitInt validator = do
 -- Done "\n\n" 1980-09-21 07:31:02 UTC
 dateTime :: Parser UTCTime
 dateTime = do
-  option 0 (dayOfWeek <* AC.char ',')
+  _ <- option 0 (dayOfWeek <* AC.char ',')
   ((d,m,y), (tod,tz)) <- (,) <$> (date <* fws) <*> (time <* ocfws)
   let dt' = fromGregorianValid (toInteger y) m d
   case dt' of
@@ -276,8 +282,8 @@ zone :: Parser TimeZone
 zone = do
   sign <- eitherP (AC.char '-') (AC.char '+')
   case sign of
-    Left  l -> minutesToTimeZone . negate . minutes <$> fourDigit
-    Right r -> minutesToTimeZone . minutes <$> fourDigit
+    Left  _ -> minutesToTimeZone . negate . minutes <$> fourDigit
+    Right _ -> minutesToTimeZone . minutes <$> fourDigit
   where
     minutes (a,b,c,d) = (((a*10)+b) * 60) + ((c*10) + d)
     fourDigit :: Parser (Int, Int, Int, Int)
@@ -322,6 +328,7 @@ addr_spec :: Parser ByteString
 addr_spec = ret <$> local_part <* AC.char '@' <*> domain
   where ret l r = l <> "@" <> r
 
+local_part :: Parser ByteString
 local_part = dot_atom <|> quoted_string
 
 domain :: Parser ByteString
@@ -333,9 +340,12 @@ domain_literal
   *> ((\xs -> [91] ++ (L.concat xs) ++ [92]) <$> many' (option [] fws *> dcontent))
   <* word8 92
 
+dcontent :: Parser [Word8]
 dcontent = many1 dtext <|> quotedPair
 
+dtextPred :: Word8 -> Bool
 dtextPred w = no_ws_ctlPred w || (w>=33 && w<=90) || (w>=94 && w<= 126)
+dtext :: Parser Word8
 dtext = satisfy dtextPred
 
 -- | * 3.5 Overall Message Syntax
@@ -402,6 +412,7 @@ body = BSC.pack <$> many AC.anyChar
 
 --  ** 3.6 Field Definitions
 -- | 3.6.1. The origination date field
+orig_date :: Parser Field
 orig_date = header "Date" (Date <$> dateTime)
 
 -- | 3.6.2. Originator fields
@@ -446,12 +457,14 @@ id_left = dot_atom_text <|> pack <$> no_fold_quote
 id_right :: Parser ByteString
 id_right = dot_atom_text <|> pack <$> no_fold_literal
 
+no_fold_quote :: Parser [Word8]
 no_fold_quote = do
   l <- dquote
   m <- L.concat <$> many' (option [] (asList qtext) <|> quotedPair)
   r <- dquote
   return $ [l] ++ m ++ [r]
 
+no_fold_literal :: Parser [Word8]
 no_fold_literal = do
   l <- word8 91 -- '['
   m <- L.concat <$> many' (option [] (asList dtext) <|> quotedPair)
@@ -474,6 +487,7 @@ keywords = header "Keywords" (Keywords <$> kwrds)
       return $ x:xs
 
 -- | 3.6.6. Resent fields
+resent_date, resent_from, resent_sender, resent_to,resent_cc,resent_bcc,resent_msg_id :: Parser Field
 resent_date   = header "Resent-Date"       (ResentDate      <$> dateTime)
 resent_from   = header "Resent-From"       (ResentFrom      <$> mailbox_list)
 resent_sender = header "Resent-Sender"     (ResentSender    <$> mailbox)
@@ -500,7 +514,7 @@ received = header "Received" (Received <$> (name_val_list <* AC.char ';') <*> (d
 -- Right [("by","10.112.112.39"),("with","SMTP"),("id","in7csp2918309lbb")]
 name_val_list :: Parser [(ByteString, ByteString)]
 name_val_list = do
-  ocfws
+  _ <- ocfws
   n  <- option Nothing (Just <$> name_val_pair)
   ns <- many (ocfws *> (Just <$> name_val_pair))
   return . catMaybes $ n:ns

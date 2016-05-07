@@ -15,10 +15,7 @@
 module Network.Parser.RfcCommon where
 --------------------------------------------------------------------------------
 import           Control.Applicative
-import           Control.Monad              (join)
 import           Data.Attoparsec.ByteString as BS
-import           Data.ByteString
-import qualified Data.ByteString.Char8      as C
 import           Data.Word
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
@@ -74,15 +71,5 @@ text = crlf <|> BS.satisfy char_not_ctl
 --------------
 -- | Utilities
 --------------
-
-appcon :: [a] -> [[a]] -> [a]
-appcon = (. join) . (++)
-
--- | return a word inside a list
-word8l w = (:[]) <$> word8 w
-
--- | Convert a ByteString Word to ByteString Char
-toRepr = C.unpack . pack
-
 asList :: Parser a -> Parser [a]
 asList p = (:[]) <$> p

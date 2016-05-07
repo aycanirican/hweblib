@@ -21,9 +21,9 @@ module Network.Parser.Rfc7231 where
 import           Control.Applicative
 import           Data.Attoparsec.ByteString       as BS
 import           Data.Attoparsec.ByteString.Char8 as AC
-import           Data.Attoparsec.Combinator
+
 import           Data.ByteString
-import           Data.Char                        (digitToInt)
+
 import           Data.Monoid
 import           Data.Scientific
 import           Data.Time
@@ -62,9 +62,11 @@ data MediaType
 -- |
 -- >>> parseOnly media_type "multipart/form-data; boundary=------------------------d380791e8587bb9a"
 -- Right (MediaType "multipart" "form-data" [("boundary","------------------------d380791e8587bb9a")])
+media_type :: Parser MediaType
 media_type = MediaType <$> type_ <* AC.char '/'
              <*> subtype
              <*> many (ows *> AC.char ';' *> ows *> parameter)
+type_, subtype :: Parser ByteString
 type_ = token
 subtype = token
 
@@ -90,6 +92,7 @@ content_coding :: Parser ByteString
 content_coding = token
 
 -- * 3.1.2.2.  Content-Encoding
+content_encoding :: Parser [ByteString]
 content_encoding = dash1 content_coding
 
 
@@ -117,6 +120,7 @@ Content-Location = absolute-URI / partial-URI
 -}
 
 -- TODO: add partial_uri
+content_location :: Parser URI
 content_location = R3986.absoluteUri -- <|> partial-URI
 
 
@@ -226,6 +230,7 @@ from = R5322.mailbox
 
 -- * 5.5.2.  Referer
 -- TODO: add partial-URI
+referer :: Parser URI
 referer = R3986.absoluteUri
 
 -- * 5.5.3.  User-Agent
@@ -271,11 +276,12 @@ product_version = token
 -- |
 -- >>> parse http_date "Fri, 31 Dec 1999 23:59:59 GMT\n"
 -- Done "\n" 1999-12-31 23:59:59 UTC
+http_date :: Parser UTCTime
 http_date = imf_fixdate -- <|> obs_date
 
 imf_fixdate :: Parser UTCTime
 imf_fixdate
-  = do day_name >> AC.char ',' >> sp
+  = do _ <- day_name >> AC.char ',' >> sp
        ((d,m,y), tod) <- (,) <$> date1 <* sp
                              <*> time_of_day <* sp <* AC.string "GMT"
        let dt' = fromGregorianValid (toInteger y) m d
@@ -344,11 +350,7 @@ retry_after :: Parser (Either UTCTime Int)
 retry_after = eitherP http_date delay_seconds
 
 delay_seconds :: Parser Int
-delay_seconds = do
-  sec <- AC.scientific
-  case floatingOrInteger sec of
-    Left  r -> fail "Not an integer"
-    Right i -> return i
+delay_seconds = read <$> many1 AC.digit
 
 -- * 7.1.4.  Vary
 
