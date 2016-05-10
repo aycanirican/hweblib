@@ -24,7 +24,8 @@ import           Network.Parser.Rfc2045           (transportPadding)
 import           Network.Parser.Rfc2234           (alphaPred, crlf, digitPred,
                                                    manyNtoM, octet)
 import           Network.Parser.Rfc2822           (text)
-import           Network.Parser.Rfc5322           (Message (..), message)
+import           Network.Parser.Rfc5322           (Message (..), fields,
+                                                   message)
 --------------------------------------------------------------------------------
 -- Prelude.map Data.Char.ord "'()+_,-./:=?"
 bcharsnospacePred :: Word8 -> Bool
@@ -63,7 +64,8 @@ discardText = many line *> text
   where line = option 32 (many text *> crlf)
 
 bodyPart :: Parser Message
-bodyPart = message
+bodyPart = Message <$> fields
+                   <*> option Nothing (Just . pack <$> (crlf *> many octet))
 
 preamble, epilogue :: Parser Word8
 preamble = discardText *> return 0
@@ -74,9 +76,9 @@ multipartBody :: ByteString -> Parser [Message]
 multipartBody str = do
   let sep = dashBoundary str *> transportPadding
   _ <- manyTill octet (sep *> crlf)
-  xs <- many (parseTill bodyPart $ sep <* crlf)
-  x <- parseTill bodyPart $ sep <* "--"
-  return $ xs ++ [x]
+  parseTill (append' <$> many (parseTill bodyPart $ crlf <* sep <* crlf) <*> bodyPart) $ crlf <* sep <* "--"
+
+  where append' xs x = xs ++ [x]
 
 -- multipartBody2 ::ByteString -> Parser [Message]
 -- multipartBody2 str = do
