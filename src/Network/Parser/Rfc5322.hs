@@ -342,12 +342,11 @@ dtext = satisfy p
 -- >>> parse message "Content-Type: text/plain\n\nThis is a multi\nline message.\n\0"
 message :: Parser Message
 message = Message <$> (fields <* crlf) <*> (option Nothing (Just <$> body))
-
 -- (*(*998text CRLF) *998text)
 -- >>> parse body "asdasd\nasdasd\n\0"
 -- Done "\NUL" "asdasd\nasdasd\n"
 body :: Parser ByteString
-body = BSC.intercalate "\n" <$> (text998 `sepBy` crlf)
+body = fst <$> match (text998 `sepBy` crlf)
 
 text998 :: Parser ByteString
 text998 = textMax 998
