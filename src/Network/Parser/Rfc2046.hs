@@ -24,8 +24,7 @@ import           Network.Parser.Rfc2045           (transportPadding)
 import           Network.Parser.Rfc2234           (alphaPred, crlf, digitPred,
                                                    manyNtoM, octet)
 import           Network.Parser.Rfc2822           (text)
-import           Network.Parser.Rfc5322           (Message (..), fields,
-                                                   message)
+import           Network.Parser.Rfc5322           (Message (..), fields)
 --------------------------------------------------------------------------------
 -- Prelude.map Data.Char.ord "'()+_,-./:=?"
 bcharsnospacePred :: Word8 -> Bool
