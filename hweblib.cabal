@@ -36,12 +36,14 @@ Library
                  , Network.Parser.Rfc5234
                  , Network.Parser.Rfc3986
                  , Network.Parser.Rfc5322
+                 , Network.Parser.Rfc5646
                  , Network.Parser.Rfc7230
                  , Network.Parser.Rfc7231
                  , Network.Parser.Rfc7232
                  , Network.Parser.Rfc7233
                  , Network.Parser.Rfc7234
                  , Network.Parser.Mime
+  Other-modules: Network.Parser.Utils
 
   -- Packages needed in order to build this package.
   Build-depends: base >= 4 && < 5
