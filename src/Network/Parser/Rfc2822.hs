@@ -131,18 +131,21 @@ qtext :: Parser Word8
 qtext = satisfy qtextPred
 {-# INLINABLE qtext #-}
 
+-- |
+-- parseOnly qcontent "asd"
+-- Just "a"
+-- parseOnly qcontent "\afoo"
+-- Just "\a"
 qcontent :: Parser ByteString
-qcontent = option mempty (pack <$> asList qtext) <|> (pack <$> quotedPair)
+qcontent = pack <$> (asList qtext <|> quotedPair)
 
 -- |
--- parseOnly quoted_string "\foobar"\""
+-- parseOnly quoted_string "\"foobar\""
 -- Just "foobar"
 quoted_string :: Parser ByteString
-quoted_string = do
-  _ <- ocfws >> dquote
-  r1 <- B.concat <$> (many1 (option [] fws *> qcontent) <|> option [" "] ((:[]) . pack <$> fws))
-  _ <- dquote >> ocfws
-  return r1
+quoted_string = ocfws *> dquote *> content <* dquote <* ocfws
+  where
+    content = B.concat <$> (many1 (option [] fws *> qcontent) <|> option [" "] ((:[]) . pack <$> fws))
 
 -- | * 3.2.6. Miscellaneous tokens
 word :: Parser ByteString
