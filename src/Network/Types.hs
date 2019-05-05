@@ -6,6 +6,7 @@ module Network.Types
          HTTPVersion(..)
        , http10
        , http11
+       , http20
        , Headers
        , RequestUri(..)
        , URI(..)
@@ -34,6 +35,10 @@ http10 = HTTPVersion 1 0
 -- | HTTP 1.1
 http11 :: HTTPVersion
 http11 = HTTPVersion 1 1
+
+-- | HTTP 2.0
+http20 :: HTTPVersion
+http20 = HTTPVersion 2 0
 
 -- data HttpMessage
 --   = HttpMessage { mVersion        :: HTTPVersion
