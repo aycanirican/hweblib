@@ -19,7 +19,6 @@ import           Control.Applicative
 import           Data.Attoparsec.ByteString       as A
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString
-import           Data.Monoid
 import           Data.Time
 import           Data.Word
 --------------------------------------------------------------------------------
