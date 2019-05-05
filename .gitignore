@@ -1,5 +1,8 @@
 *~
 dist/
+dist-newstyle/
+.ghc*
+result*
 .hpc
 *.prof
 *.hi
