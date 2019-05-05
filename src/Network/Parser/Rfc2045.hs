@@ -21,7 +21,6 @@ import           Data.Attoparsec.ByteString
 import           Data.Attoparsec.ByteString.Char8 (decimal, stringCI)
 import           Data.ByteString
 import           Data.Map.Strict                  as M hiding (singleton)
-import           Data.Monoid
 import           Data.Word                        (Word8)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234

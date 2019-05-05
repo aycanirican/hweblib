@@ -20,7 +20,6 @@ import           Control.Applicative
 import           Data.Attoparsec.ByteString
 import           Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString
-import           Data.Monoid
 import qualified Data.Text.Encoding               as E
 import           Data.Time
 --------------------------------------------------------------------------------

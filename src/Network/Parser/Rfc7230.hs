@@ -22,11 +22,7 @@ import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString                  hiding (count)
 import qualified Data.ByteString.Char8            as BSC
-
-import           Data.Monoid
 import           Data.Scientific
-
-
 import           Data.Typeable
 import           Data.Word                        (Word8)
 import           GHC.Generics                     (Generic)
