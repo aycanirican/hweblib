@@ -56,7 +56,7 @@ testGetRequestWithHeaders
                                     , ("Keep-Alive","300")
                                     , ("Connection","keep-alive")
                                     ]
-                        , body = Just ""}))
+                        , body = Nothing }))
     (parseOnly http_message getData1)
 
 
@@ -72,7 +72,7 @@ testGetRequestWithQuery
                                     , ("Accept-Encoding","gzip, deflate")
                                     , ("Cookie","PREF=ID=7ca99b92f2f9afe9:FF=0:TM=1400941989:LM=1400941989:S=w2rcVppuXeOj6pXi; NID=67=N3XLJvzIIHqfvn_LuNTgBmA59ni-8YNTZ-RFASwaaByYQ9q0wfljtVHijfzQIGVJQ8axRzvOoBI9idcimOPUVI4obXncxIUUVf17AgubzR8KFBQVlXb7n2S0LNV43EPV")
                                     , ("Connection","keep-alive") ]
-                        , body = Just ""}))
+                        , body = Nothing }))
 
     (parseOnly http_message getData2)
 

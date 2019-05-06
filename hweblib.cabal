@@ -1,10 +1,9 @@
 Name:                hweblib
 Version:             0.7.0
 Synopsis:            Haskell Web Library
-Description:
-  The library includes attoparsec based incremental parsers for
-  rfc7230 (http) and rfc3986 (uri), rfc2045-46 (mime). The package
-  name will subject to change due to broad range of rfc coverage.
+Description:         The library includes attoparsec based incremental parsers for
+                     rfc7230 (http) and rfc3986 (uri), rfc2045-46 (mime). The package
+                     name will subject to change due to broad range of rfc coverage.
 
 Homepage:            http://github.com/aycanirican/hweblib
 License:             BSD3
@@ -22,8 +21,8 @@ Extra-Source-Files:  README.md tests/mime-wiki.txt tests/benchmark-results.txt
 Library
   hs-source-dirs:    src
   default-language:  Haskell2010
-  ghc-options: -Wall -fwarn-tabs -O2 -fdicts-cheap -funbox-strict-fields -fmax-simplifier-iterations=10
-
+  ghc-options:       -Wall -fwarn-tabs -O2 -fdicts-cheap -funbox-strict-fields -fmax-simplifier-iterations=10
+  
   -- Modules exported by the library.
   exposed-modules: Network.Types
                  , Network.Http 
@@ -46,22 +45,22 @@ Library
                  , Network.Parser.Rfc7234
                  , Network.Parser.Mime
                  , Network.Parser.Utils
-
+  
   -- Packages needed in order to build this package.
   build-depends: base >= 4 && < 5
-               , containers
-               , bytestring
-               , mtl 
-               , transformers
-               , text
-               , attoparsec
-               , scientific
-               , time
-
+              , containers
+              , bytestring
+              , mtl 
+              , transformers
+              , text
+              , attoparsec
+              , scientific
+              , time
+  
   if impl(ghc < 8.0)
     build-depends:
-      generic-deriving >= 1.10  && < 2,
-      semigroups       >= 0.8.4 && < 1
+        generic-deriving >= 1.10  && < 2,
+        semigroups       >= 0.8.4 && < 1
 
 test-suite doctest
   type:              exitcode-stdio-1.0
@@ -74,21 +73,21 @@ test-suite doctest
   default-language:  Haskell2010
   ghc-options:       -w -threaded -rtsopts -with-rtsopts=-N
   x-doctest-options: --fast
-                             
-Test-suite hunit
-  Type:              exitcode-stdio-1.0
+                                                   
+test-suite hunit
+  type:              exitcode-stdio-1.0
   hs-source-dirs:    tests
-  Main-is:           hunit.hs
-  Default-language:  Haskell2010
+  main-is:           hunit.hs
+  default-language:  Haskell2010
   ghc-options:       -w -threaded -rtsopts -with-rtsopts=-N
-
-  Other-modules: Test.Parser.Rfc3986
+  
+  other-modules: Test.Parser.Rfc3986
                , Test.Parser.Rfc2045
                , Test.Parser.Rfc2822
                , Test.Parser.Rfc7230
                , Test.Parser.Parser
-
-  Build-depends: base >= 4 && < 5
+  
+  build-depends: base >= 4 && < 5
                , containers
                , bytestring
                , mtl
@@ -100,23 +99,23 @@ Test-suite hunit
                , text
                , hweblib
 
-benchmark common-parses
-  Type:             exitcode-stdio-1.0
-  hs-source-dirs:   benchmarks tests
-  Main-is:          common-parses.hs
-  hs-source-dirs:   benchmarks
-  Default-language: Haskell2010
-  ghc-options:      -w -O2 -threaded -fdicts-cheap -funbox-strict-fields
+-- benchmark common-parses
+--   type:             exitcode-stdio-1.0
+--   hs-source-dirs:   benchmarks tests
+--   main-is:          common-parses.hs
+--   hs-source-dirs:   benchmarks tests
+--   default-language: Haskell2010
+--   ghc-options:      -w -O2 -threaded -fdicts-cheap -funbox-strict-fields
 
-  Build-depends: base >= 4 && < 5
-               , containers
-               , bytestring
-               , mtl
-               , transformers
-               , attoparsec
-               , criterion
-               , HUnit
-               , hweblib
+--   build-depends: base >= 4 && < 5
+--                , containers
+--                , bytestring
+--                , mtl
+--                , transformers
+--                , attoparsec
+--                , criterion
+--                , HUnit
+--                , hweblib
 
 source-repository head
   type:     git
