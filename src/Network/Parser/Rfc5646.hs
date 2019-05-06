@@ -21,6 +21,8 @@ import           Data.Attoparsec.ByteString       as A
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString                  as B hiding (count, singleton)
 import           Data.Word
+import           Data.Semigroup ((<>))
+
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc5234
 --------------------------------------------------------------------------------
