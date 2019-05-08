@@ -1,5 +1,5 @@
 Name:                hweblib
-Version:             0.7.0
+Version:             0.8.0
 Synopsis:            Haskell Web Library
 Description:         The library includes attoparsec based incremental parsers for
                      rfc7230 (http) and rfc3986 (uri), rfc2045-46 (mime). The package
@@ -25,7 +25,8 @@ Library
   
   -- Modules exported by the library.
   exposed-modules: Network.Types
-                 , Network.Http 
+                 , Network.Http
+                 , Network.Message
                  , Network.Parser.RfcCommon
                  , Network.Parser.Rfc2045
                  , Network.Parser.Rfc2046
@@ -48,14 +49,16 @@ Library
   
   -- Packages needed in order to build this package.
   build-depends: base >= 4 && < 5
-              , containers
-              , bytestring
-              , mtl 
-              , transformers
-              , text
-              , attoparsec
-              , scientific
-              , time
+               , containers
+               , bytestring
+               , mtl 
+               , transformers
+               , text
+               , attoparsec
+               , scientific
+               , time
+               , case-insensitive
+               , pretty-simple
   
   if impl(ghc < 8.0)
     build-depends:

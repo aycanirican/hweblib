@@ -18,6 +18,7 @@ module Network.Parser.Rfc7230
 --------------------------------------------------------------------------------
 import           Control.Applicative
 import           Control.Monad                    (join)
+import           Data.Semigroup                   ((<>))
 import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString                  hiding (count)

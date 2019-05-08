@@ -26,8 +26,8 @@ import           Data.Time
 import           Prelude                    hiding (take, takeWhile)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2045
+import           Network.Parser.Rfc2046
 --------------------------------------------------------------------------------
-
 
 -- We're converting mime types to Haskell Types in order to get rid of
 -- string case conversion...
@@ -70,12 +70,12 @@ parseMimeHeaders = do
     hVal = decodeLatin1 . hValue
     f z x =
         case hType x of
-          IdH -> z { mvHeaders = M.insert IdH (hVal x) (mvHeaders z) }
+          IdH          -> z { mvHeaders = M.insert IdH (hVal x) (mvHeaders z) }
           DescriptionH -> z { mvHeaders = M.insert DescriptionH (hVal x) (mvHeaders z) }
-          VersionH -> z { mvHeaders = M.insert VersionH (hVal x) (mvHeaders z) }
-          EncodingH -> z { mvHeaders = M.insert EncodingH (hVal x) (mvHeaders z) }
+          VersionH     -> z { mvHeaders = M.insert VersionH (hVal x) (mvHeaders z) }
+          EncodingH    -> z { mvHeaders = M.insert EncodingH (hVal x) (mvHeaders z) }
           ExtensionH e -> z { mvHeaders = M.insert (ExtensionH e) (hVal x) (mvHeaders z) }
-          ContentH -> z { mvType = Type ((string2mimetype . hValue) x) (bs2t $ hParams x) }
+          ContentH     -> z { mvType    = Type ((string2mimetype . hValue) x) (bs2t $ hParams x) }
 
 -- | * Data Types
 -----------------

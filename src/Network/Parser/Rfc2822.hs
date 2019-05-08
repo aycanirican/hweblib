@@ -36,7 +36,7 @@ import           Network.Parser.RfcCommon         hiding (ctext)
 
 -- | Used to generate arbitrary header parsers
 header :: ByteString -> Parser a -> Parser a
-header key p = AC.stringCI (key <> ":") *> p <* crlf
+header key p = AC.stringCI (key <> ": ") *> p <* crlf
 
 -- ** 3.2.1. Primitive Tokens
 no_ws_ctlPred :: Word8 -> Bool

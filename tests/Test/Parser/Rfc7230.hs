@@ -1,3 +1,4 @@
+-- -*- dante-target: "hunit"; -*-
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Parser.Rfc7230 where

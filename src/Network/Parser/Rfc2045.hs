@@ -17,6 +17,7 @@ module Network.Parser.Rfc2045 where
 --------------------------------------------------------------------------------
 import           Control.Applicative
 import           Control.Monad                    (join)
+import           Data.Semigroup                   ((<>))
 import           Data.Attoparsec.ByteString
 import           Data.Attoparsec.ByteString.Char8 (decimal, stringCI)
 import           Data.ByteString
@@ -84,7 +85,8 @@ attribute :: Parser [Word8]
 attribute = token
 
 parameter :: Parser (ByteString, ByteString)
-parameter = res <$> (attribute <* word8 61) <*> value
+parameter = res <$> (attribute <* word8 61)
+                <*> value
     where res a v = (pack a, v)
 
 x_token :: Parser ByteString
@@ -117,10 +119,11 @@ extensionToken :: Parser ByteString
 extensionToken = x_token
 
 -- >>> parseOnly content "Content-type: text/plain; charset=us-ascii\n"
--- Right (Header {hType = ContentH, hValue = "textplain", hParams = fromList [("charset","us-ascii")]})
+-- Right (Header {hType = ContentH, hValue = "text/plain", hParams = fromList [("charset","us-ascii")]})
+
 -- >>> let a = parseOnly content "Content-type: text/plain; charset=us-ascii\n"
 -- >>>     b = parseOnly content "Content-type: text/plain; charset=\"us-ascii\"\n"
--- >>> in a == b
+-- >>> a == b
 -- True
 content :: Parser Header
 content
@@ -175,7 +178,7 @@ qp_part = qp_section
 
 qp_line :: Parser [Word8]
 qp_line = do
-  a <- many $ (++) <$> qp_segment <*> (transportPadding *> crlf >>= return . (:[]))
+  a <- many $ (++) <$> qp_segment <*> (: []) <$> (transportPadding *> crlf)
   b <- qp_part <* transportPadding
   return $ join a ++ b
 

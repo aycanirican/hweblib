@@ -16,6 +16,7 @@
 module Network.Parser.Rfc7232 where
 --------------------------------------------------------------------------------
 import           Control.Applicative
+import           Data.Semigroup                   ((<>))
 import           Data.Attoparsec.ByteString       as A
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString

@@ -1,13 +1,14 @@
-{ mkDerivation, attoparsec, base, bytestring, containers, doctest
-, Glob, HUnit, mtl, scientific, stdenv, text, time, transformers
+{ mkDerivation, attoparsec, base, bytestring, case-insensitive
+, containers, doctest, Glob, HUnit, mtl, pretty-simple, scientific
+, stdenv, text, time, transformers
 }:
 mkDerivation {
   pname = "hweblib";
-  version = "0.7.0";
+  version = "0.8.0";
   src = ./.;
   libraryHaskellDepends = [
-    attoparsec base bytestring containers mtl scientific text time
-    transformers
+    attoparsec base bytestring case-insensitive containers mtl
+    pretty-simple scientific text time transformers
   ];
   testHaskellDepends = [
     attoparsec base bytestring containers doctest Glob HUnit mtl

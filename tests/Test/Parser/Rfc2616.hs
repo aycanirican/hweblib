@@ -9,7 +9,7 @@ import           Test.HUnit
 import           Test.Parser.Parser
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
-import           Network.Parser.Rfc2616
+import           Network.Parser.Rfc7230
 import           Network.Parser.RfcCommon
 import           Network.Types
 --------------------------------------------------------------------------------

@@ -22,10 +22,13 @@ import           Data.ByteString                  (ByteString, cons, pack,
                                                    singleton)
 import qualified Data.ByteString.Char8            as BSC
 import           Data.Char                        (digitToInt)
+import           Data.List                        (find)
 import           Data.Monoid
 import           Data.Time
 import           Data.Word                        (Word8)
 import           Prelude                          hiding (id, take, takeWhile)
+import           Data.CaseInsensitive  ( CI )
+import qualified Data.CaseInsensitive as CI
 --------------------------------------------------------------------------------
 import qualified Network.Parser.Rfc2822           as R2822
 import           Network.Parser.Rfc5234
@@ -58,8 +61,27 @@ data Field = TraceField Trace
            | Subject ByteString
            | Comments ByteString
            | Keywords [ByteString]
-           | OptionalField ByteString ByteString
+           | ContentType ByteString [(ByteString, ByteString)]
+           | OptionalField (CI ByteString) ByteString
              deriving (Eq, Show)
+
+-- * Common field accessors
+
+lookupHeader :: CI ByteString -> Message -> Maybe ByteString
+lookupHeader name msg
+  = case find pred' (messageFields msg) of
+      Just (OptionalField _ v) -> Just v
+      Just _                   -> Nothing
+      Nothing                  -> Nothing
+  where
+    pred' (OptionalField k _) = k == name
+    pred' _                   = False
+    
+contentType :: Message -> Maybe ByteString
+contentType = lookupHeader "content-type"
+
+contentLength :: Message -> Maybe ByteString
+contentLength = lookupHeader "content-legnth"
 
 data Received
   = Received { receivedNameVals :: [ByteString]
@@ -80,13 +102,13 @@ data NameAddress
 -- 3.2.  Lexical Tokens
 -- | * 3.2.1.  Quoted characters
 quoted_pair :: Parser ByteString
-quoted_pair = (\a b -> pack $ a:b:[]) <$> word8 92 <*> (vchar <|> wsp)
+quoted_pair = (\a b -> pack [a,b]) <$> word8 92 <*> (vchar <|> wsp)
 
 -- | * 3.2.2.  Folding White Space and Comments
 -- Parse Folding Whitespace
 fws :: Parser ByteString
 fws = do
-  _ <- option [] (many wsp *> (asList crlf))
+  _ <- option [] (many wsp *> asList crlf)
   _ <- many1 wsp
   return " "
 
@@ -249,7 +271,7 @@ month
 -- Right 2015
 year :: Parser Int
 year =  conv <$> (fws *> count 4 AC.digit <* fws)
-  where conv = sum . map (uncurry (*)) . zip [1000, 100, 10, 1] . fmap digitToInt
+  where conv = sum . zipWith (*) [1000, 100, 10, 1] . fmap digitToInt
 
 -- >>> parseOnly time "04:20:05 +0200"
 -- Right (04:20:05,+0200)
@@ -292,7 +314,7 @@ mailbox :: Parser NameAddress
 mailbox = name_addr <|> (NameAddress Nothing <$> addr_spec)
 
 name_addr :: Parser NameAddress
-name_addr = NameAddress <$> option Nothing (Just <$> display_name)
+name_addr = NameAddress <$> optional display_name
                         <*> angle_addr
 
 angle_addr :: Parser ByteString
@@ -339,12 +361,17 @@ dtext = satisfy p
   where p w = (w>=33 && w<=90) || (w>=94 && w<= 126)
 
 -- 3.5.  Overall Message Syntax
+-- >>> :set -XOverloadedStrings
 -- >>> parse message "Content-Type: text/plain\n\nThis is a multi\nline message.\n\0"
+-- Done "\NUL" (Message {messageFields = [OptionalField "Content-Type" " text/plain"], messageBody = Just "This is a multi\nline message.\n"})
+
 message :: Parser Message
-message = Message <$> (fields <* crlf) <*> (option Nothing (Just <$> body))
+message = Message <$> (fields <* crlf) <*> optional body
+
 -- (*(*998text CRLF) *998text)
 -- >>> parse body "asdasd\nasdasd\n\0"
 -- Done "\NUL" "asdasd\nasdasd\n"
+
 body :: Parser ByteString
 body = fst <$> match (text998 `sepBy` crlf)
 
@@ -393,7 +420,7 @@ fields
 
 -- | Used to generate arbitrary header parsers
 header :: ByteString -> Parser a -> Parser a
-header key p = AC.stringCI (key <> ":") *> p <* crlf
+header key p = AC.stringCI (key <> ": ") *> p <* crlf
 
 -- | 3.6.1. The origination date field
 orig_date :: Parser Field
@@ -472,7 +499,7 @@ resent_msg_id = header "Resent-Message-ID" (ResentMessageID <$> msg_id)
 
 -- | 3.6.7. Trace fields
 trace :: Parser Trace
-trace = Trace <$> option Nothing (Just <$> return_path)
+trace = Trace <$> optional return_path
               <*> many1 received
 
 return_path :: Parser ByteString
@@ -489,7 +516,7 @@ received_token = word <|> angle_addr <|> addr_spec <|> domain
 
 -- | 3.6.8. Optional fields
 optional_field :: Parser Field
-optional_field = OptionalField <$> (field_name <* word8 58) <*> (unstructured <* crlf)
+optional_field = OptionalField <$> (CI.mk <$> field_name <* word8 58 <* many sp) <*> (unstructured <* crlf)
 
 field_name :: Parser ByteString
 field_name = pack <$> many1 ftext

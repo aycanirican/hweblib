@@ -22,6 +22,7 @@ import           Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString
 import qualified Data.Text.Encoding               as E
 import           Data.Time
+import           Data.Semigroup                   ((<>))
 --------------------------------------------------------------------------------
 import           Network.Parser.Mime
 import           Network.Parser.Rfc2045           (extensionToken, parameter,

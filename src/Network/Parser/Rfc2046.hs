@@ -26,7 +26,7 @@ import           Network.Parser.Rfc2234           (alphaPred, crlf, digitPred,
 import           Network.Parser.Rfc2822           (text)
 import           Network.Parser.Rfc5322           (Message (..), fields)
 --------------------------------------------------------------------------------
--- Prelude.map Data.Char.ord "'()+_,-./:=?"
+-- >>> Prelude.map Data.Char.ord "'()+_,-./:=?"
 bcharsnospacePred :: Word8 -> Bool
 bcharsnospacePred w
   =  digitPred w
@@ -43,7 +43,8 @@ bchars = bcharsnospace <|> satisfy (== 32)
 boundary :: Parser [Word8]
 boundary = manyNtoM 0 69 bchars
 
--- >>> parseOnly (dashBoundary "hebeluphodolo") "--hebeluphodolo"
+-- >>> :set -XOverloadedStrings
+-- >>> parseOnly (dashBoundary "hebelup hodolo") "--hebelup hodolo"
 -- Right ()
 dashBoundary :: ByteString -> Parser ()
 dashBoundary str = (word8 45 *> word8 45 *> AC.string str <?> "invalid boundary") >> return ()
@@ -71,13 +72,17 @@ preamble = discardText *> return 0
 epilogue = discardText *> return 0
 
 -- >>> c <- Prelude.readFile "test/mime-wiki.txt"
+
+-- * Multipart Body Parsing
+
+-- Parse a multipart message body into `Message`s
 multipartBody :: ByteString -> Parser [Message]
 multipartBody str = do
-  let sep = dashBoundary str *> transportPadding
-  _ <- manyTill octet (sep *> crlf)
-  parseTill (append' <$> many (parseTill bodyPart $ crlf <* sep <* crlf) <*> bodyPart) $ crlf <* sep <* "--"
-
-  where append' xs x = xs ++ [x]
+    let sep = dashBoundary str *> transportPadding
+    _ <- manyTill octet (sep *> crlf)
+    parseTill (append' <$> many (parseTill bodyPart $ crlf <* sep <* crlf) <*> bodyPart) $ crlf <* sep <* "--"
+  where
+    append' xs x = xs ++ [x]
 
 -- multipartBody2 ::ByteString -> Parser [Message]
 -- multipartBody2 str = do
