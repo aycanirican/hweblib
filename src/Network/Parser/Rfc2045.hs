@@ -178,7 +178,7 @@ qp_part = qp_section
 
 qp_line :: Parser [Word8]
 qp_line = do
-  a <- many $ (++) <$> qp_segment <*> (: []) <$> (transportPadding *> crlf)
+  a <- many $ (++) <$> qp_segment <*> ((:[]) <$> (transportPadding *> crlf))
   b <- qp_part <* transportPadding
   return $ join a ++ b
 

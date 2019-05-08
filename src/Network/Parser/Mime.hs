@@ -26,7 +26,6 @@ import           Data.Time
 import           Prelude                    hiding (take, takeWhile)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2045
-import           Network.Parser.Rfc2046
 --------------------------------------------------------------------------------
 
 -- We're converting mime types to Haskell Types in order to get rid of
