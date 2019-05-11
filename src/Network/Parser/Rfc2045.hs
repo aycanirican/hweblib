@@ -96,7 +96,7 @@ x_token = stringCI "x-" *> (pack <$> many1 (satisfy x_token_pred))
     x_token_pred w = tokenPred w && (w /= 32)
 
 value :: Parser ByteString
-value = (pack <$> token) <|> quoted_string
+value = quoted_string <|> (pack <$> token)
 
 -- discrete and composite types are a little bit different from BNF
 -- definitions in order to keep code flow clean.

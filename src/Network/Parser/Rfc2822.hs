@@ -2,7 +2,7 @@
 
 -- |
 -- Module      :  Network.Parser.Rfc2822
--- Copyright   :  Aycan iRiCAN 2010-2015
+-- Copyright   :  Aycan iRiCAN 2010-2019
 -- License     :  BSD3
 --
 -- Maintainer  :  iricanaycan@gmail.com
@@ -131,7 +131,7 @@ qtext :: Parser Word8
 qtext = satisfy qtextPred
 {-# INLINABLE qtext #-}
 
--- |
+
 -- parseOnly qcontent "asd"
 -- Just "a"
 -- parseOnly qcontent "\afoo"
@@ -139,13 +139,18 @@ qtext = satisfy qtextPred
 qcontent :: Parser ByteString
 qcontent = pack <$> (asList qtext <|> quotedPair)
 
--- |
--- parseOnly quoted_string "\"foobar\""
--- Just "foobar"
+-- | Parse a quoted string
+
+-- >>> let d = "\r\n\t\a\b\"\\"
+-- >>> map Data.Char.ord d
+-- [13,10,9,7,8,34,92]
+
+-- >>> :set -XOverloadedStrings
+-- >>> parseOnly quoted_string "\"foo is on the bar\""
+-- Right "foo is on the bar"
+
 quoted_string :: Parser ByteString
-quoted_string = ocfws *> dquote *> content <* dquote <* ocfws
-  where
-    content = B.concat <$> (many1 (option [] fws *> qcontent) <|> option [" "] ((:[]) . pack <$> fws))
+quoted_string = pack . join <$> (dquote *> many (asList qdtext <|> quotedPair) <* dquote)
 
 -- | * 3.2.6. Miscellaneous tokens
 word :: Parser ByteString
@@ -229,7 +234,7 @@ date = (,,) <$> day <*> month <*> year
 -- >>> parseOnly year "2015"
 -- Right 2015
 year :: Parser Int
-year = sum . map (uncurry (*)) . zip [1000, 100, 10, 1] . fmap digitToInt <$> count 4 AC.digit
+year = sum . zipWith (*) [1000, 100, 10, 1] . fmap digitToInt <$> count 4 AC.digit
 
 -- >>> parseOnly month " Feb"
 -- Right 2
@@ -299,8 +304,7 @@ address = try (asList mailbox)
 
 mailbox :: Parser NameAddress
 mailbox = try name_addr
-          <|> do a <- addr_spec
-                 return $ NameAddress Nothing a
+      <|> NameAddress Nothing <$> addr_spec
 
 name_addr :: Parser NameAddress
 name_addr = do n <- option mempty display_name
@@ -500,8 +504,9 @@ resent_bcc    = header "Resent-Bcc"        (ResentBcc       <$> (address_list <|
 resent_msg_id = header "Resent-Message-ID" (ResentMessageID <$> msg_id)
 
 -- | 3.6.7. Trace fields
+
 trace :: Parser Trace
-trace = Trace <$> option Nothing (Just <$> return_path)
+trace = Trace <$> optional return_path
               <*> many1 received
 
 return_path :: Parser ByteString
@@ -518,7 +523,7 @@ received = header "Received" (Received <$> (name_val_list <* AC.char ';') <*> (d
 name_val_list :: Parser [(ByteString, ByteString)]
 name_val_list = do
   _ <- ocfws
-  n  <- option Nothing (Just <$> name_val_pair)
+  n  <- optional name_val_pair
   ns <- many (ocfws *> (Just <$> name_val_pair))
   return . catMaybes $ n:ns
 
@@ -562,6 +567,7 @@ data Trace
   = Trace { traceReturn   :: Maybe ByteString
           , traceReceived :: [Received]
           } deriving (Eq, Show)
+                     
 data NameAddress
     = NameAddress
       { naName :: Maybe ByteString

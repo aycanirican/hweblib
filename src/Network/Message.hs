@@ -1,118 +1,222 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards, LambdaCase #-}
 
 {-  parsing emails according to Rfc 5322 and friends... -}
 
 module Network.Message
-  -- ( parseMessage )
+  ( parseMessage
+  , ParsedMessage
+  , mkParsedMessage
+  , topLevelMessage
+  , partsOfMessage
+  , UnableToParse
+  , ContentType (..)
+  , Message
+  , MediaType
+  , SubType
+  , Parameters
+  , contentType
+  , contentLength
+  , lookupParameter
+  , multiPartBody
+  , message
+  , body
+  , subject
+  , attachment
+    -- * utils
+  , removeAngles
+  , mkAttachment
+  , attachments
+  , attachmentName
+  , attachmentBody
+  )
   where
 
 --------------------------------------------------------------------------------
-import Control.Applicative ((<|>))
+import Data.Either
+import qualified Data.List as L
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as T
 import Data.Attoparsec.ByteString
 import Data.Attoparsec.ByteString.Char8 as AC
 import Data.ByteString as BS
 import qualified Network.Parser.Rfc5322 as R5322
 import qualified Network.Parser.Rfc2045 as R2045
+import           Network.Parser.Rfc2183 as R2183
 import qualified Network.Parser.Rfc2046 as R2046
-import Data.Map.Strict as M
 import Data.Semigroup ((<>))
 --------------------------------------------------------------------------------
+-- * Types
 
--- * Aliases
-type Message = R5322.Message
+-- | A rfc5322 message
+type Message = R5322.Message -- messageFields, messageBody
+
+-- | Parsed message consists of the main message and it's mime parts
+-- also represented as list of messages
 type ParsedMessage = (Message, [Message])
+mkParsedMessage :: Message -> [Message] -> ParsedMessage
+mkParsedMessage = (,)
+
+topLevelMessage :: ParsedMessage -> Message
+topLevelMessage = fst
+
+partsOfMessage :: ParsedMessage -> [Message]
+partsOfMessage = snd
+
+-- | UnableToParse includes parse error as a string and a partially
+-- filled Message record, which may or may not include all of the
+-- parts of the original raw message
+type UnableToParse = (String, Maybe Message)
+
 
 -- * Parsing
+
+-- | Parse a message as deep as we can.
 parseMessage
   :: BS.ByteString
-  -> Either String ParsedMessage
+  -> Either UnableToParse ParsedMessage
 parseMessage rawMessage
-  = case parseOnly R5322.message rawMessage of
-      Left  err -> Left ("Unable to parse raw email source: ++ " <> err)
-      Right msg5322 -> case R5322.messageBody msg5322 of
-        Nothing   -> Left "body not found in the message" 
-        Just body -> case R5322.contentType msg5322 of
-          Nothing -> Left "No content-type header in raw message!"
-          Just ct -> if ("multipart/" `isPrefixOf` ct)
-            then
-            (case parseOnly ctParamsParser ct of
-              Left  err         -> Left err -- TODO: handle no parameter case
-              Right (mtype, ps) -> case hasBoundary ps of
-                Nothing -> Left "content-type header doesn't declare a boundary" -- TODO: handle no boundary case
-                Just b  -> case parseOnly (R2046.multipartBody b) body of
-                  Left err -> Left $ "Unable to parse mime parts from the body: " ++ err ++ show b
-                  Right ms -> Right (msg5322, ms))
-            else
-            (case R5322.contentLength msg5322 of
-              Nothing -> Left "no content length detected!"
-              Just l  -> Left $ "content-length found: " ++ show l) -- TODO: "text/plain; charset=us-ascii" by default
+  = case message rawMessage of
+      Left  err -> Left ("Unable to parse raw message: " <> err, Nothing)
+      Right msg -> case body msg of
+        Nothing   -> Right (msg, []) 
+        Just msgbody -> case contentType msg of -- try to determine contenttype
+          Just (ContentType "multipart" "mixed" ps) ->
+            case lookupParameter "boundary" ps of
+              Nothing    -> Left ("cannot find boundary in content-type header for multipart message", Just msg) -- TODO: handle no boundary case
+              Just bndry -> case multiPartBody bndry msgbody of
+                Left err    -> Left (err, Just msg)
+                Right parts -> Right (msg, parts) -- ParsedMessage
+          Just _ -> case contentLength msg of
+              Nothing -> Left ("no content length detected!", Just msg)
+              Just l  -> Left ("content-length found: " <> show l, Just msg)
+          Nothing -> Right (msg, [])
+
+-- * Useful data types and functions goes here..
+
+-- | We describe content-type header as a data type which has a
+-- media-type, a subtype and parameter list (here we use associated
+-- lists to represent them). You can use `lookupParameter` to query
+-- parameters.
+type MediaType = ByteString
+type SubType   = ByteString
+type Parameters = [(ByteString, ByteString)]
+
+data ContentType = ContentType MediaType SubType Parameters
+
+-- | Parse a Message from given bytestring
+message :: ByteString -> Either String Message
+message = parseOnly R5322.message
+
+-- | Body of the message
+body :: Message -> Maybe ByteString
+body = R5322.messageBody
+
+-- | Subject of the message
+subject :: Message -> Maybe ByteString
+subject = R5322.subjectHeader
+
+-- | Extract content-type header
+contentType :: Message -> Maybe ContentType
+contentType msg = case R5322.contentTypeHeader msg of
+  Nothing -> Nothing
+  Just v  -> case parseOnly parseContentType v of
+    Left  l -> Nothing
+    Right r -> Just r
   where
-    hasBoundary = M.lookup "boundary"
-    ctParamsParser :: Parser (ByteString, (M.Map ByteString ByteString))
-    ctParamsParser
-      = do ty <- (\a b -> a <> "/" <> b) <$> R2045.mtype <* word8 47 <*> R2045.subtype
-           ps <- AC.many' (R2045.semicolonsp *> _ctParam)
-           return (ty, M.fromList ps)
+    parseContentType :: Parser ContentType
+    parseContentType = ContentType <$> (R2045.mtype <* word8 47)
+                                   <*> (BS.pack <$> R2045.token)
+                                   <*> many' (R2045.semicolonsp *> R2045.parameter)
 
-_ctParam :: Parser (ByteString, ByteString)
-_ctParam = res <$> (R2045.attribute <* word8 61)
-              <*> (try (word8 34 *> R2045.value <* word8 34) <|> R2045.value)
-  where res a v = (pack a, v)
+-- | Extract content-length header as an `Int`
+contentLength :: Message -> Maybe Int
+contentLength m = case R5322.contentLengthHeader m of
+    Nothing -> Nothing
+    Just v  -> case parseOnly parseContentLength v of
+      Left  l -> Nothing
+      Right r -> Just r
+  where
+    parseContentLength :: Parser Int
+    parseContentLength = read <$> many1 AC.digit
 
+-- wrap it since we may want to change implementation...
+lookupParameter :: ByteString -> [(ByteString, ByteString)] -> Maybe ByteString
+lookupParameter = Prelude.lookup
+
+-- | Given a boundary string, extract mime parts from message body
+multiPartBody :: ByteString -> ByteString -> Either String [Message]
+multiPartBody boundary = parseOnly (R2046.multipartBody boundary)
+
+
+type Body       = ByteString
+type Name       = ByteString
+type Attachment = (Name, Maybe Body)
+
+mkAttachment :: Name -> Maybe Body -> Attachment
+mkAttachment name bdy = (name, bdy)
+
+attachmentName :: Attachment -> ByteString
+attachmentName = fst
+
+attachmentBody :: Attachment -> Maybe ByteString
+attachmentBody = snd
+
+-- | Given a message, it tries to extract the attachment
+attachment :: Message -> Either String Attachment
+attachment msg
+  = case R5322.contentDispositionHeader msg of
+      Nothing -> Left "content-disposition header not found"
+      Just hv -> case parseOnly dispositionParser hv of
+        Left   err -> Left "Unable to parse disposition header"
+        Right disp -> case dispositionType disp of
+          R2183.Attachment -> case L.find matchFilename (dispositionParameters disp) of
+            Just (R2183.Filename name) -> Right $ mkAttachment name     (R5322.messageBody msg)
+            _                          -> Left    "attachment doesn't have a filename"
+          _          -> Left "Message disposition is not an attachment"
+  where
+    matchFilename :: DispositionParameter -> Bool
+    matchFilename (Filename _) = True
+    matchFilename _            = False
+
+attachments :: ParsedMessage -> [Attachment]
+attachments = Data.Either.rights . fmap attachment . partsOfMessage
+
+-- * Utilities
+
+-- | Given a nameaddress bytestring, it removes angles and returns
+-- rest of it as `Text`
+removeAngles :: ByteString -> T.Text
+removeAngles = modify . T.decodeUtf8
+  where modify = T.takeWhile (/='>') . T.dropWhile (=='<') . T.dropWhile (==' ')
+
+-- >>> :set -XOverloadedStrings
+-- >>> let msg = R5322.Message [R5322.mkHeaderField "content-disposition" "attachment; filename=\"foo.html\""] (Just "contentz")
+-- >>> attachment msg
+-- Right ("foo.html",Just "contentz")
+-- >>> let msgQuotedFilename = R5322.Message [R5322.mkHeaderField "content-disposition" "attachment; filename=\"foo.html\""] (Just "contentz")
+-- >>> attachment msg
+-- Right ("foo.html",Just "contentz")
+
+-- pPrintNoColor . either error attachment.  
+
+-- >>> :set -XOverloadedStrings
 -- >>> import Text.Pretty.Simple (pPrint, pPrintNoColor)
--- <interactive>:1:1: warning: [-Wdeprecations]
---     Module ‘Data.Attoparsec’ is deprecated:
---       This module will be removed in the next major release.
--- >>> msg <- Data.ByteString.Char8.readFile "tests/2046-1.txt"
--- >>> pPrintNoColor . parseMessage $ msg
--- Right 
---     ( Message 
---         { messageFields = 
---             [ From 
---                 [ NameAddress 
---                     { naName = Just "Nathaniel Borenstein" 
---                     , naAddr = "nsb@bellcore.com" 
---                     } 
---                 ]
---             , To 
---                 [ NameAddress 
---                     { naName = Just "Ned Freed" 
---                     , naAddr = "ned@innosoft.com" 
---                     } 
---                 ]
---             , Date 1993-03-22 07:56:48 UTC
---             , Subject "Sample message" 
---             , OptionalField "MIME-Version" "1.0" 
---             , OptionalField "Content-type" "multipart/mixed; boundary="simpleboundary"" 
---             ] 
---         , messageBody = Just "This is the preamble.  It is to be ignored, though it
---       is a handy place for composition agents to include an
---       explanatory note to non-MIME conformant readers.
---       
---       --simpleboundary
---       
---       This is implicitly typed plain US-ASCII text.
---       It does NOT end with a linebreak.
---       --simpleboundary
---       Content-type: text/plain; charset=us-ascii
---       
---       This is explicitly typed plain US-ASCII text.
---       It DOES end with a linebreak.
---       
---       --simpleboundary--
---       
---       This is the epilogue.  It is also to be ignored." 
---         } 
---     , 
---         [ Message 
---             { messageFields = []
---             , messageBody = Just "This is implicitly typed plain US-ASCII text.
---       It does NOT end with a linebreak." 
---             } 
---         , Message 
---             { messageFields = [ OptionalField "Content-type" "text/plain; charset=us-ascii" ]
---             , messageBody = Just "This is explicitly typed plain US-ASCII text.
---       It DOES end with a linebreak." 
---             } 
---         ] 
---     )
+-- >>> msg <- Data.ByteString.Char8.readFile "/tmp/foo-attachment"
+-- >>> either show attachment $ parseMessage $ msg
+-- <interactive>:144:14-23: error:
+--     • Couldn't match type ‘Either String Network.Message.Attachment’
+--                      with ‘[Char]’
+--       Expected type: Message -> String
+--         Actual type: Message -> Either String Network.Message.Attachment
+--     • In the second argument of ‘either’, namely ‘attachment’
+--       In the expression: either show attachment
+--       In the expression: either show attachment $ parseMessage $ msg
+-- <interactive>:144:27-44: error:
+--     • Couldn't match type ‘(Message, [Message])’
+--                      with ‘Network.Parser.Rfc5322.Message’
+--       Expected type: Either UnableToParse Message
+--         Actual type: Either UnableToParse ParsedMessage
+--     • In the second argument of ‘($)’, namely ‘parseMessage $ msg’
+--       In the expression: either show attachment $ parseMessage $ msg
+--       In an equation for ‘it’:
+--           it = either show attachment $ parseMessage $ msg

@@ -2,7 +2,7 @@
 
 -- |
 -- Module      :  Network.Parser.Rfc5322
--- Copyright   :  Aycan iRiCAN 2010-2015
+-- Copyright   :  Aycan iRiCAN 2010-2019
 -- License     :  BSD3
 --
 -- Maintainer  :  iricanaycan@gmail.com
@@ -12,7 +12,71 @@
 -- Internet Message Format
 -- <http://www.ietf.org/rfc/rfc5322.txt>
 
-module Network.Parser.Rfc5322 where
+module Network.Parser.Rfc5322
+  ( -- Header
+    HeaderField
+  , mkHeaderName
+  , mkHeaderValue
+  , mkHeaderField
+  , headerName
+  , headerValue
+  , lookupHeader
+  , contentTypeHeader
+  , contentLengthHeader
+  , contentDispositionHeader
+  , fromHeader
+  , toHeader
+  , subjectHeader
+    
+    -- Message
+  , Message (..)
+  , NameAddress (..)
+  , StructuredHeader (..)
+    
+  -- parsers
+  , mailbox
+  , mailboxList
+  , address
+  , group
+  , groupList
+  , origDate
+  , from
+  , to
+  , subject
+  , message
+  , references
+  , replyTo
+  , comments
+  , keywords
+  , addressList
+  , resentTo
+  , resentCc
+  , resentBcc
+  , resentSender
+  , trace
+  , traceReceived
+  , traceReturn
+  , receivedDate
+  , returnPath
+  , path
+  , received
+  , receivedToken
+  , resentMsgId
+  , resentFrom
+  , resentDate
+  , inReplyTo
+  , messageId
+  , bcc
+  , cc
+  , sender
+  , specials
+  , fields
+  , qtext
+  , qcontent
+  , dateTime
+  , optionalField
+  )
+  where
 --------------------------------------------------------------------------------
 import           Control.Applicative
 import           Control.Monad                    (join)
@@ -32,56 +96,76 @@ import qualified Data.CaseInsensitive as CI
 --------------------------------------------------------------------------------
 import qualified Network.Parser.Rfc2822           as R2822
 import           Network.Parser.Rfc5234
-import           Network.Parser.RfcCommon         hiding (ctext, text)
+import qualified Network.Parser.RfcCommon         as RfcCommon
 --------------------------------------------------------------------------------
--- Data Types
+
+-- * Interface
+
+-- Message Headers
+type HeaderName  = CI ByteString
+mkHeaderName :: CI ByteString -> HeaderName
+mkHeaderName name = name
+
+headerName :: HeaderField -> CI ByteString
+headerName = fst
+
+type HeaderValue = ByteString
+mkHeaderValue :: ByteString -> HeaderValue
+mkHeaderValue x = x
+
+headerValue :: HeaderField -> ByteString
+headerValue = snd
+
+type HeaderField = (HeaderName, HeaderValue)
+mkHeaderField :: CI ByteString -> ByteString -> HeaderField
+mkHeaderField name value = (mkHeaderName name, mkHeaderValue value)
+
 data Message
-  = Message { messageFields :: [Field]
+  = Message { messageFields :: [HeaderField]
             , messageBody   :: Maybe ByteString
             } deriving (Eq, Show)
 
-data Field = TraceField Trace
-           | ResentDate UTCTime
-           | ResentFrom [NameAddress]
-           | ResentSender NameAddress
-           | ResentTo [NameAddress]
-           | ResentCc [NameAddress]
-           | ResentBcc [NameAddress]
-           | ResentMessageID ByteString
-           | Date UTCTime
-           | From [NameAddress]
-           | Sender NameAddress
-           | ReplyTo [NameAddress]
-           | To [NameAddress]
-           | Cc [NameAddress]
-           | Bcc [NameAddress]
-           | MessageID ByteString
-           | InReplyTo [ByteString]
-           | References [ByteString]
-           | Subject ByteString
-           | Comments ByteString
-           | Keywords [ByteString]
-           | ContentType ByteString [(ByteString, ByteString)]
-           | OptionalField (CI ByteString) ByteString
-             deriving (Eq, Show)
+-- * Common Accessors
+lookupHeader :: HeaderName -> Message -> Maybe HeaderField
+lookupHeader name msg = find ((== name) . headerName) (messageFields msg)
 
--- * Common field accessors
+mkHeaderQuery :: HeaderName -> Message -> Maybe HeaderValue
+mkHeaderQuery key msg = headerValue <$> lookupHeader key msg
 
-lookupHeader :: CI ByteString -> Message -> Maybe ByteString
-lookupHeader name msg
-  = case find pred' (messageFields msg) of
-      Just (OptionalField _ v) -> Just v
-      Just _                   -> Nothing
-      Nothing                  -> Nothing
-  where
-    pred' (OptionalField k _) = k == name
-    pred' _                   = False
-    
-contentType :: Message -> Maybe ByteString
-contentType = lookupHeader "content-type"
+-- Common Headers
+contentTypeHeader, contentLengthHeader, contentDispositionHeader, fromHeader, toHeader, subjectHeader :: Message -> Maybe HeaderValue
+contentTypeHeader        = mkHeaderQuery "content-type"
+contentLengthHeader      = mkHeaderQuery "content-length"
+contentDispositionHeader = mkHeaderQuery "content-disposition"
+fromHeader               = mkHeaderQuery "from"
+toHeader                 = mkHeaderQuery "to"
+subjectHeader            = mkHeaderQuery "subject"
 
-contentLength :: Message -> Maybe ByteString
-contentLength = lookupHeader "content-legnth"
+-- Helper Data Structures
+data StructuredHeader
+  = TraceField      Trace
+  | ResentDate      UTCTime
+  | ResentFrom      [NameAddress]
+  | ResentSender    NameAddress
+  | ResentTo        [NameAddress]
+  | ResentCc        [NameAddress]
+  | ResentBcc       [NameAddress]
+  | ResentMessageID ByteString
+  | Date            UTCTime
+  | From            [NameAddress]
+  | Sender          NameAddress
+  | ReplyTo         [NameAddress]
+  | To              [NameAddress]
+  | Cc              [NameAddress]
+  | Bcc             [NameAddress]
+  | MessageID       ByteString
+  | InReplyTo       [ByteString]
+  | References      [ByteString]
+  | Subject         ByteString
+  | Comments        ByteString
+  | Keywords        [ByteString]
+  | OptionalField   (CI ByteString) ByteString
+  deriving (Eq, Show)
 
 data Received
   = Received { receivedNameVals :: [ByteString]
@@ -99,16 +183,14 @@ data NameAddress
       , naAddr :: ByteString
       } deriving (Eq, Show)
 
--- 3.2.  Lexical Tokens
--- | * 3.2.1.  Quoted characters
-quoted_pair :: Parser ByteString
-quoted_pair = (\a b -> pack [a,b]) <$> word8 92 <*> (vchar <|> wsp)
+quotedPair :: Parser ByteString
+quotedPair = (\a b -> pack [a,b]) <$> word8 92 <*> (vchar <|> wsp)
 
 -- | * 3.2.2.  Folding White Space and Comments
 -- Parse Folding Whitespace
 fws :: Parser ByteString
 fws = do
-  _ <- option [] (many wsp *> asList crlf)
+  _ <- option [] (many wsp *> RfcCommon.asList crlf)
   _ <- many1 wsp
   return " "
 
@@ -120,7 +202,7 @@ ctext = satisfy (\w ->
                   || (w >= 93 && w <= 126))
 
 ccontent :: Parser ByteString
-ccontent = (singleton <$> ctext) <|> quoted_pair <|> comment
+ccontent = (singleton <$> ctext) <|> quotedPair <|> comment
 
 -- Parse a comment
 comment :: Parser ByteString
@@ -133,7 +215,7 @@ comment = do
 
 cfws :: Parser ByteString
 cfws = BSC.concat <$> (many1 (option mempty fws *> comment) <* option mempty fws
-                      <|> asList fws)
+                      <|> RfcCommon.asList fws)
 
 -- | * 3.2.3. Atom
 atext :: Parser Word8
@@ -143,20 +225,21 @@ atext = alpha <|> digit <|> satisfy p
 atom :: Parser ByteString
 atom = ocfws *> (pack <$> many1 atext) <* ocfws
 
-dot_atom_text :: Parser ByteString
-dot_atom_text = do
+dotAtomText :: Parser ByteString
+dotAtomText = do
   t1 <- many1 atext
   t2 <- many ((:) <$> word8 46 <*> many1 atext)
   return (pack t1 <> pack (join t2))
 
-dot_atom :: Parser ByteString
-dot_atom = ocfws *> dot_atom_text <* ocfws
+dotAtom :: Parser ByteString
+dotAtom = ocfws *> dotAtomText <* ocfws
 
 specials :: Parser ByteString
 specials = singleton <$> (satisfy p <|> dquote)
   where p = inClass "()<>[]:;@\\,."
 
 -- | * 3.2.4.  Quoted Strings
+
 qtext :: Parser Word8
 qtext = satisfy p
   where
@@ -166,7 +249,7 @@ qtext = satisfy p
 {-# INLINABLE qtext #-}
 
 qcontent :: Parser ByteString
-qcontent = pack <$> (asList qtext <|> quotedPair)
+qcontent = pack <$> (RfcCommon.asList qtext <|> RfcCommon.quotedPair)
 
 -- | * 3.2.5.  Miscellaneous Tokens
 word :: Parser ByteString
@@ -216,8 +299,8 @@ twoDigitInt validator = do
 -- Done "\n\n" 2016-04-20 11:59:01 UTC
 -- >>> parse dateTime "Mon, 21 Sep 1980 10:01:02 +0230\n\n"
 -- Done "\n\n" 1980-09-21 07:31:02 UTC
-date_time :: Parser UTCTime
-date_time = do
+dateTime :: Parser UTCTime
+dateTime = do
   _ <- option 0 (dayOfWeek <* AC.char ',')
   ((d,m,y), (tod,tz)) <- (,) <$> date <*> time <* ocfws
   let dt' = fromGregorianValid (toInteger y) m d
@@ -308,69 +391,65 @@ zone = do
 
 -- | * 3.4. Address Specification
 address :: Parser [NameAddress]
-address = asList mailbox <|> group
+address = RfcCommon.asList mailbox <|> group
 
 mailbox :: Parser NameAddress
-mailbox = name_addr <|> (NameAddress Nothing <$> addr_spec)
+mailbox = nameAddr <|> (NameAddress Nothing <$> addrSpec)
 
-name_addr :: Parser NameAddress
-name_addr = NameAddress <$> optional display_name
-                        <*> angle_addr
+nameAddr :: Parser NameAddress
+nameAddr = NameAddress <$> optional displayName
+                        <*> angleAddr
 
-angle_addr :: Parser ByteString
-angle_addr = ocfws *> word8 60 *> addr_spec <* word8 62 <* ocfws
+angleAddr :: Parser ByteString
+angleAddr = ocfws *> word8 60 *> addrSpec <* word8 62 <* ocfws
 
 group :: Parser [NameAddress]
-group = display_name *> word8 58 *> option [] group_list <* word8 59 <* ocfws
+group = displayName *> word8 58 *> option [] groupList <* word8 59 <* ocfws
 
-display_name :: Parser ByteString
-display_name = BSC.unwords <$> phrase
+displayName :: Parser ByteString
+displayName = BSC.unwords <$> phrase
 
-mailbox_list :: Parser [NameAddress]
-mailbox_list = (:) <$> mailbox <*> many (AC.char ',' *> mailbox)
+mailboxList :: Parser [NameAddress]
+mailboxList = (:) <$> mailbox <*> many (AC.char ',' *> mailbox)
 
-address_list :: Parser [NameAddress]
-address_list = (++) <$> address <*> (join <$> many (AC.char ',' *> address))
+addressList :: Parser [NameAddress]
+addressList = (++) <$> address <*> (join <$> many (AC.char ',' *> address))
 
-group_list :: Parser [NameAddress]
-group_list = mailbox_list <|> (cfws *> pure [])
+groupList :: Parser [NameAddress]
+groupList = mailboxList <|> (cfws *> pure [])
 
 -- | 3.4.1.  Addr-Spec Specification
-addr_spec :: Parser ByteString
-addr_spec = ret <$> local_part <* AC.char '@' <*> domain
+addrSpec :: Parser ByteString
+addrSpec = ret <$> localPart <* AC.char '@' <*> domain
   where ret l r = l <> "@" <> r
 
-local_part :: Parser ByteString
-local_part = dot_atom <|> R2822.quoted_string
+localPart :: Parser ByteString
+localPart = dotAtom <|> R2822.quoted_string
 
 domain :: Parser ByteString
-domain = dot_atom <|> domain_literal
+domain = dotAtom <|> domainLiteral
 
-domain_literal :: Parser ByteString
-domain_literal
+domainLiteral :: Parser ByteString
+domainLiteral
   = do _ <- ocfws >> word8 91
        res <- BSC.concat <$> many ((<>) <$> option mempty fws *> dcontent)
        _ <- word8 92 >> ocfws
        return ("[" <> res <> "]")
 
 dcontent :: Parser ByteString
-dcontent = (pack <$> many1 dtext) <|> quoted_pair
+dcontent = (pack <$> many1 dtext) <|> quotedPair
 
 dtext :: Parser Word8
 dtext = satisfy p
   where p w = (w>=33 && w<=90) || (w>=94 && w<= 126)
 
 -- 3.5.  Overall Message Syntax
--- >>> :set -XOverloadedStrings
--- >>> parse message "Content-Type: text/plain\n\nThis is a multi\nline message.\n\0"
--- Done "\NUL" (Message {messageFields = [OptionalField "Content-Type" " text/plain"], messageBody = Just "This is a multi\nline message.\n"})
-
 message :: Parser Message
 message = Message <$> (fields <* crlf) <*> optional body
 
--- (*(*998text CRLF) *998text)
--- >>> parse body "asdasd\nasdasd\n\0"
--- Done "\NUL" "asdasd\nasdasd\n"
+-- >>> A.parseOnly fields "Date: foo\n\n"
+fields :: Parser [HeaderField]
+fields = many (mkHeaderField <$> (CI.mk <$> fieldName <* AC.string ": ") <*> unstructured <* crlf)
 
 body :: Parser ByteString
 body = fst <$> match (text998 `sepBy` crlf)
@@ -392,94 +471,60 @@ text = satisfy p
           || w == 12
           || (w >= 14 && w <= 127)
 
-fields :: Parser [Field]
-fields
-  = many (   TraceField <$> trace
-         <|> resent_date
-         <|> resent_from
-         <|> resent_sender
-         <|> resent_to
-         <|> resent_cc
-         <|> resent_bcc
-         <|> resent_msg_id
-         <|> orig_date
-         <|> from
-         <|> sender
-         <|> reply_to
-         <|> to
-         <|> cc
-         <|> bcc
-         <|> message_id
-         <|> in_reply_to
-         <|> references
-         <|> subject
-         <|> comments
-         <|> keywords
-         <|> optional_field
-         )
-
--- | Used to generate arbitrary header parsers
-header :: ByteString -> Parser a -> Parser a
-header key p = AC.stringCI (key <> ": ") *> p <* crlf
-
 -- | 3.6.1. The origination date field
-orig_date :: Parser Field
-orig_date = header "Date" (Date <$> date_time)
+origDate :: Parser UTCTime
+origDate = dateTime
 
 -- | 3.6.2. Originator fields
-from :: Parser Field
-from = header "From" (From <$> mailbox_list)
+from :: Parser [NameAddress]
+from = mailboxList
 
-sender :: Parser Field
-sender = header "Sender" (Sender <$> mailbox)
+sender :: Parser NameAddress
+sender = mailbox
 
-reply_to :: Parser Field
-reply_to = header "Reply To" (ReplyTo <$> address_list)
+replyTo :: Parser [NameAddress]
+replyTo = addressList
 
 -- | 3.6.3. Destination address fields
-to :: Parser Field
-to = header "To"  (To <$> address_list)
-
-cc :: Parser Field
-cc = header "Cc"  (Cc <$> address_list)
-
-bcc :: Parser Field
-bcc = header "Bcc" (Bcc <$> option [] (address_list <|> (cfws *> return [])))
+to, cc, bcc :: Parser [NameAddress]
+to  = addressList
+cc  = addressList
+bcc = option [] (addressList <|> (cfws *> return []))
 
 -- | 3.6.4. Identification fields
-message_id :: Parser Field
-message_id  = header "Message-ID"  (MessageID <$> msg_id)
+messageId :: Parser ByteString
+messageId = msgId
 
-in_reply_to :: Parser Field
-in_reply_to = header "In-Reply-To" (InReplyTo <$> many1 msg_id)
+inReplyTo :: Parser [ByteString]
+inReplyTo = many1 msgId
 
-references :: Parser Field
-references  = header "References"  (References <$> many1 msg_id)
+references :: Parser [ByteString]
+references = many1 msgId
 
-msg_id :: Parser ByteString
-msg_id = ocfws *> word8 60 *> mid <* word8 62 <* ocfws
+msgId :: Parser ByteString
+msgId = ocfws *> word8 60 *> mid <* word8 62 <* ocfws
   where
-    mid = res <$> id_left <* word8 64 <*> id_right
+    mid = res <$> idLeft <* word8 64 <*> idRight
     res l r = l <> "@" <> r
 
-id_left :: Parser ByteString
-id_left = dot_atom_text
+idLeft :: Parser ByteString
+idLeft = dotAtomText
 
-id_right :: Parser ByteString
-id_right = dot_atom_text <|> no_fold_literal
+idRight :: Parser ByteString
+idRight = dotAtomText <|> noFoldLiteral
 
-no_fold_literal :: Parser ByteString
-no_fold_literal = fst <$> match ("[" >> many dtext >> "]")
+noFoldLiteral :: Parser ByteString
+noFoldLiteral = fst <$> match ("[" >> many dtext >> "]")
 
 -- | 3.6.5. Informational fields
-subject :: Parser Field
-subject  = header "Subject" (Subject <$> unstructured)
+subject :: Parser ByteString
+subject  = unstructured
 
-comments :: Parser Field
-comments = header "Comments" (Comments <$> unstructured)
+comments :: Parser ByteString
+comments = unstructured
 
-keywords :: Parser Field
-keywords = header "Keywords" (Keywords <$> kwrds)
+keywords :: Parser [ByteString]
+keywords = kwrds
   where
     kwrds :: Parser [ByteString]
     kwrds = do
@@ -488,38 +533,45 @@ keywords = header "Keywords" (Keywords <$> kwrds)
       return $ x ++ join xs
 
 -- | 3.6.6. Resent fields
-resent_date, resent_from,resent_sender, resent_to, resent_cc, resent_bcc, resent_msg_id :: Parser Field
-resent_date   = header "Resent-Date"       (ResentDate      <$> date_time)
-resent_from   = header "Resent-From"       (ResentFrom      <$> mailbox_list)
-resent_sender = header "Resent-Sender"     (ResentSender    <$> mailbox)
-resent_to     = header "Resent-To"         (ResentTo        <$> address_list)
-resent_cc     = header "Resent-Cc"         (ResentCc        <$> address_list)
-resent_bcc    = header "Resent-Bcc"        (ResentBcc       <$> option [] (address_list <|> (cfws *> return [])))
-resent_msg_id = header "Resent-Message-ID" (ResentMessageID <$> msg_id)
+resentDate :: Parser UTCTime
+resentDate = dateTime
+
+resentFrom, resentTo, resentCc, resentBcc :: Parser [NameAddress]
+resentFrom   = mailboxList
+resentTo     = addressList
+resentCc     = addressList
+resentBcc    = option [] (addressList <|> (cfws *> return []))
+
+resentMsgId :: Parser ByteString
+resentMsgId  = msgId
+
+resentSender :: Parser NameAddress
+resentSender = mailbox
 
 -- | 3.6.7. Trace fields
+
 trace :: Parser Trace
-trace = Trace <$> optional return_path
+trace = Trace <$> optional returnPath
               <*> many1 received
 
-return_path :: Parser ByteString
-return_path = header "Return-Path" path
+returnPath :: Parser ByteString
+returnPath = path
 
 path :: Parser ByteString
-path = angle_addr <|> (ocfws >> AC.char '<' >> ocfws >> AC.char '>' >> ocfws >> pure "<>")
+path = angleAddr <|> (ocfws >> AC.char '<' >> ocfws >> AC.char '>' >> ocfws >> pure "<>")
 
 received :: Parser Received
-received = header "Received" (Received <$> (many received_token <* AC.char ';') <*> (date_time <?> "date-time"))
+received = Received <$> (many receivedToken <* AC.char ';') <*> (dateTime <?> "date-time")
 
-received_token :: Parser ByteString
-received_token = word <|> angle_addr <|> addr_spec <|> domain
+receivedToken :: Parser ByteString
+receivedToken = word <|> angleAddr <|> addrSpec <|> domain
 
 -- | 3.6.8. Optional fields
-optional_field :: Parser Field
-optional_field = OptionalField <$> (CI.mk <$> field_name <* word8 58 <* many sp) <*> (unstructured <* crlf)
+optionalField :: Parser ByteString
+optionalField = unstructured <* crlf
 
-field_name :: Parser ByteString
-field_name = pack <$> many1 ftext
+fieldName :: Parser ByteString
+fieldName = pack <$> many1 ftext
 
 ftext :: Parser Word8
 ftext = satisfy $ \w -> (w >= 33 && w <= 57) || (w >= 59 && w <= 126)
@@ -527,3 +579,4 @@ ftext = satisfy $ \w -> (w >= 33 && w <= 57) || (w >= 59 && w <= 126)
 -- | Utils
 ocfws :: Parser ByteString
 ocfws = option mempty cfws
+

@@ -1,20 +1,20 @@
-{ nixpkgs ? import <nixpkgs> {}, compiler ? "default" }:
+{ nixpkgs ? import <nixpkgs> {}, compiler ? "default", doBenchmark ? false }:
 
 let
 
   inherit (nixpkgs) pkgs;
 
-  f = { mkDerivation, attoparsec, base, bytestring, containers
-      , doctest, Glob, HUnit, mtl, scientific, stdenv, text, time
-      , transformers, network
+  f = { mkDerivation, attoparsec, base, bytestring
+      , case-insensitive, containers, doctest, Glob, HUnit, mtl
+      , pretty-simple, scientific, stdenv, text, time, transformers
       }:
       mkDerivation {
         pname = "hweblib";
-        version = "0.7.0";
+        version = "0.8.0";
         src = ./.;
         libraryHaskellDepends = [
-          attoparsec base bytestring containers mtl scientific text time
-          transformers network
+          attoparsec base bytestring case-insensitive containers mtl
+          pretty-simple scientific text time transformers
         ];
         testHaskellDepends = [
           attoparsec base bytestring containers doctest Glob HUnit mtl
@@ -29,7 +29,9 @@ let
                        then pkgs.haskellPackages
                        else pkgs.haskell.packages.${compiler};
 
-  drv = haskellPackages.callPackage f {};
+  variant = if doBenchmark then pkgs.haskell.lib.doBenchmark else pkgs.lib.id;
+
+  drv = variant (haskellPackages.callPackage f {});
 
 in
 
