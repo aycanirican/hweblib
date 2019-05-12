@@ -24,6 +24,7 @@ module Network.Parser.Rfc5322
   , contentTypeHeader
   , contentLengthHeader
   , contentDispositionHeader
+  , contentTransferEncodingHeader
   , fromHeader
   , toHeader
   , subjectHeader
@@ -133,13 +134,14 @@ mkHeaderQuery :: HeaderName -> Message -> Maybe HeaderValue
 mkHeaderQuery key msg = headerValue <$> lookupHeader key msg
 
 -- Common Headers
-contentTypeHeader, contentLengthHeader, contentDispositionHeader, fromHeader, toHeader, subjectHeader :: Message -> Maybe HeaderValue
-contentTypeHeader        = mkHeaderQuery "content-type"
-contentLengthHeader      = mkHeaderQuery "content-length"
-contentDispositionHeader = mkHeaderQuery "content-disposition"
-fromHeader               = mkHeaderQuery "from"
-toHeader                 = mkHeaderQuery "to"
-subjectHeader            = mkHeaderQuery "subject"
+contentTypeHeader, contentLengthHeader, contentDispositionHeader, contentTransferEncodingHeader,fromHeader, toHeader, subjectHeader :: Message -> Maybe HeaderValue
+contentTypeHeader              = mkHeaderQuery "content-type"
+contentLengthHeader            = mkHeaderQuery "content-length"
+contentDispositionHeader       = mkHeaderQuery "content-disposition"
+contentTransferEncodingHeader  = mkHeaderQuery "content-transfer-encoding"
+fromHeader                     = mkHeaderQuery "from"
+toHeader                       = mkHeaderQuery "to"
+subjectHeader                  = mkHeaderQuery "subject"
 
 -- Helper Data Structures
 data StructuredHeader

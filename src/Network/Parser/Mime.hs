@@ -16,6 +16,7 @@
 module Network.Parser.Mime
   where
 --------------------------------------------------------------------------------
+import           Data.Semigroup             ((<>))
 import           Control.Applicative        ((<|>))
 import           Data.Attoparsec.ByteString
 import           Data.ByteString
