@@ -450,8 +450,12 @@ message :: Parser Message
 message = Message <$> (fields <* crlf) <*> optional body
 
 -- >>> A.parseOnly fields "Date: foo\n\n"
+
+-- >>> :set -XOverloadedStrings
+-- >>> parseOnly fields "Message-ID:\n <verylongstringthtat.has.dots.and@an.at.sign.com>\n"
+-- Right [("Message-ID","<verylongstringthtat.has.dots.and@an.at.sign.com>")]
 fields :: Parser [HeaderField]
-fields = many (mkHeaderField <$> (CI.mk <$> fieldName <* AC.string ": ") <*> unstructured <* crlf)
+fields = many (mkHeaderField <$> (CI.mk <$> fieldName <* AC.string ":") <*> (cfws *> unstructured <* crlf))
 
 body :: Parser ByteString
 body = fst <$> match (text998 `sepBy` crlf)
