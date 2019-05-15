@@ -59,7 +59,8 @@ Library
                , time
                , case-insensitive
                , pretty-simple
-               , base64-bytestring
+               , mime
+               , tagsoup
   
   if impl(ghc < 8.0)
     build-depends:

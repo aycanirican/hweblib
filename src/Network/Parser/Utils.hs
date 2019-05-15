@@ -1,5 +1,6 @@
+
 module Network.Parser.Utils
-       where
+  where
 
 --
 -- Module      :  Network.Parser.Utils
@@ -13,10 +14,11 @@ module Network.Parser.Utils
 -- Common Utilities for Parsers
 
 --------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Attoparsec.ByteString
-import           Data.Attoparsec.ByteString.Char8
-import           Data.Char
+import Control.Applicative
+import Data.Attoparsec.ByteString
+import Data.Attoparsec.ByteString.Char8
+import Data.Char
+import Prelude hiding (take)
 --------------------------------------------------------------------------------
 
 -- * Common Parsing Utilities
@@ -36,3 +38,11 @@ maxP :: Int -> Parser a -> Parser [a]
 maxP 0 _ = return empty
 maxP n p = ((:) <$> p <*> maxP (n-1) p) <|> return empty
 
+-- | delimited parser (ex: fixed 100 char only matches char 100 times
+-- maximum)
+fixed :: Int -> Parser a -> Parser a
+fixed i p = do
+    intermediate <- take i
+    case parseOnly (p <* endOfInput) intermediate of
+        Left _ -> empty
+        Right x -> return x

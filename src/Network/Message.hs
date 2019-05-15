@@ -8,7 +8,7 @@ module Network.Message
   , mkParsedMessage
   , topLevelMessage
   , partsOfMessage
-  , UnableToParse
+  , CannotParse
   , ContentType (..)
   , Message
   , MediaType
@@ -32,26 +32,29 @@ module Network.Message
   , attachmentMessage
   , attachmentName
   , attachmentBody
-  , base64Decoder
-  , quotedPrintableDecoder
+  , decodeMessage
   )
   where
 
 --------------------------------------------------------------------------------
-import Data.Either
+import           Data.Maybe (fromMaybe)
+import           Data.Either
+import Data.Char
 import qualified Data.List as L
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import Data.Attoparsec.ByteString
-import Data.Attoparsec.ByteString.Char8 as AC
-import Data.ByteString as BS
+import           Data.Attoparsec.ByteString
+import           Data.Attoparsec.ByteString.Char8 as AC
+import           Data.ByteString as BS
+import           Data.ByteString.Char8 as BSC
 import qualified Network.Parser.Rfc5322 as R5322
 import           Network.Parser.Rfc5322 ( Message (..) )
 import qualified Network.Parser.Rfc2045 as R2045
 import           Network.Parser.Rfc2183 as R2183
 import qualified Network.Parser.Rfc2046 as R2046
-import Data.Semigroup ((<>))
-import qualified Data.ByteString.Base64 as Base64
+import           Data.Semigroup ((<>))
+import qualified Codec.MIME.Base64 as Base64
+import qualified Codec.MIME.QuotedPrintable as QP (decode)
 --------------------------------------------------------------------------------
 -- * Types
 
@@ -70,35 +73,36 @@ topLevelMessage = fst
 partsOfMessage :: ParsedMessage -> [Message]
 partsOfMessage = snd
 
--- | UnableToParse includes parse error as a string and a partially
+-- | CannotParse includes parse error as a string and a partially
 -- filled Message record, which may or may not include all of the
 -- parts of the original raw message
-type UnableToParse = (String, Maybe Message)
+type CannotParse = (String, Maybe Message)
+
+cannotParse :: String -> Maybe Message -> (String, Maybe Message)
+cannotParse reason msg = (reason, msg)
 
 -- * Parsing
 
--- | Parse a message as deep as we can.
-parseMessage
-  :: BS.ByteString
-  -> Either UnableToParse ParsedMessage
+-- >>> :set -XOverloadedStrings
+-- >>> let parsed = Data.ByteString.readFile "/tmp/deneme/picus/samples/ets/0.txt" >>= return . either undefined id . parseMessage
+-- >>> parsed >>= BS.writeFile "/tmp/webshow/msg1.hs" . Data.ByteString.Char8.pack . show
+
+parseMessage :: BS.ByteString -> Either CannotParse ParsedMessage
 parseMessage rawMessage
   = case message rawMessage of
-      Left  err -> Left ("Unable to parse raw message: " <> err, Nothing)
+      Left  err -> Left $ cannotParse ("Unable to parse raw message: " <> err) Nothing
       Right msg -> case body msg of
-        Nothing   -> Right (msg, []) 
+        Nothing   -> Right $ mkParsedMessage msg []
         Just msgbody -> case contentType msg of -- try to determine contenttype
+          -- Just (ContentType "text"      "html"  ps) -> handleTextHtml etc...
           Just (ContentType "multipart" "mixed" ps) ->
             case lookupParameter "boundary" ps of
-              Nothing    -> Left ("cannot find boundary in content-type header for multipart message", Just msg) -- TODO: handle no boundary case
+              Nothing    -> Left $ cannotParse "cannot find boundary in content-type header for multipart message" (Just msg) -- TODO: handle no boundary case
               Just bndry -> case multiPartBody bndry msgbody of
-                Left err    -> Left (err, Just msg)
-                Right parts -> Right (msg, parts) -- ParsedMessage
-          Just _ -> case contentLength msg of
-              Nothing -> Left ("no content length detected!", Just msg)
-              Just l  -> Left ("content-length found: " <> show l, Just msg)
+                Left err    -> Left $ cannotParse err (Just msg)
+                Right parts -> Right $ mkParsedMessage msg parts -- ParsedMessage
+          Just _ -> Right $ mkParsedMessage (msg { messageBody = Just (decodeMessage msg) }) []
           Nothing -> Right (msg, [])
-
--- * Useful data types and functions goes here..
 
 -- | We describe content-type header as a data type which has a
 -- media-type, a subtype and parameter list (here we use associated
@@ -168,7 +172,6 @@ multiPartBody boundary = parseOnly (R2046.multipartBody boundary)
 
 type Body       = ByteString
 type Name       = ByteString
-type DecoderFun = (ByteString -> Either String ByteString)
 type Attachment = (Message, Name, Maybe Body)
 
 mkAttachment :: Message -> Name -> Maybe Body -> Attachment
@@ -184,6 +187,7 @@ attachmentMessage :: Attachment -> Message
 attachmentMessage (m,_,_) = m
 
 -- | Given a message, it tries to extract the attachment
+
 attachment :: Message -> Either String Attachment
 attachment msg
   = case R5322.contentDispositionHeader msg of
@@ -194,28 +198,23 @@ attachment msg
           R2183.Attachment -> case L.find matchFilename (dispositionParameters disp) of
             Just (R2183.Filename name) -> case R5322.messageBody msg of
               Nothing -> Right $ mkAttachment msg name (Just "")
-              Just b  -> case (createDecoder msg) b of
-                Left str      -> Left str
-                Right decoded -> Right $ mkAttachment msg name (Just decoded)
-            _                          -> Left "attachment doesn't have a filename"
-          _          -> Left "Message disposition is not an attachment"
+              Just _  -> Right $ mkAttachment msg name (Just (decodeMessage msg))
+            _       -> Left "attachment doesn't have a filename"
+          _         -> Left "Message disposition is not an attachment"
   where
     matchFilename :: DispositionParameter -> Bool
     matchFilename (Filename _) = True
     matchFilename _            = False
 
-createDecoder :: Message -> DecoderFun
-createDecoder msg = case R5322.contentTransferEncodingHeader msg of
-  Nothing                 -> Right
-  Just "base64"           -> base64Decoder
-  Just "quoted-printable" -> quotedPrintableDecoder
-  Just _                  -> tobeimplementedDecoder
-
-base64Decoder, quotedPrintableDecoder,tobeimplementedDecoder :: ByteString -> Either String ByteString
-base64Decoder          = Base64.decode
-quotedPrintableDecoder = parseOnly R2045.quoted_printable
-tobeimplementedDecoder = const $ Left "Not implemented yet"
-  
+decodeMessage :: Message -> Body
+decodeMessage msg
+  = let bdy = fromMaybe "" (messageBody msg)
+    in case R5322.contentTransferEncodingHeader msg of
+      Nothing                 -> bdy
+      Just "base64"           -> BS.pack . Base64.decode . BSC.unpack $ bdy
+      Just "quoted-printable" -> R2045.quotedPrintable bdy -- TODO: inefficient
+      Just _                  -> bdy
+       
 attachments :: ParsedMessage -> [Attachment]
 attachments = Data.Either.rights . fmap attachment . partsOfMessage
 

@@ -4,17 +4,18 @@ let
 
   inherit (nixpkgs) pkgs;
 
-  f = { mkDerivation, attoparsec, base, base64-bytestring
-      , bytestring, case-insensitive, containers, doctest, Glob, HUnit
-      , mtl, pretty-simple, scientific, stdenv, text, time, transformers
+  f = { mkDerivation, attoparsec, base, bytestring
+      , case-insensitive, containers, doctest, Glob, HUnit, mime, mtl
+      , pretty-simple, scientific, stdenv, tagsoup, text, time
+      , transformers
       }:
       mkDerivation {
         pname = "hweblib";
         version = "0.8.0";
         src = ./.;
         libraryHaskellDepends = [
-          attoparsec base base64-bytestring bytestring case-insensitive
-          containers mtl pretty-simple scientific text time transformers
+          attoparsec base bytestring case-insensitive containers mime mtl
+          pretty-simple scientific tagsoup text time transformers
         ];
         testHaskellDepends = [
           attoparsec base bytestring containers doctest Glob HUnit mtl

@@ -15,17 +15,20 @@
 
 module Network.Parser.Rfc2045 where
 --------------------------------------------------------------------------------
+import           Data.Char
 import           Control.Applicative
-import           Control.Monad                    (join)
-import           Data.Semigroup                   ((<>))
+import           Control.Monad (join, void)
+import           Data.Semigroup ((<>))
 import           Data.Attoparsec.ByteString
-import           Data.Attoparsec.ByteString.Char8 (decimal, stringCI)
-import           Data.ByteString
-import           Data.Map.Strict                  as M hiding (singleton)
-import           Data.Word                        (Word8)
+import           Data.Attoparsec.ByteString.Char8 (decimal, stringCI, char)
+import           Data.ByteString as BS
+import qualified Data.ByteString.Char8 as BSC
+import           Data.Map.Strict as M hiding (singleton)
+import           Data.Word (Word8)
 --------------------------------------------------------------------------------
+import           Network.Parser.Utils
 import           Network.Parser.Rfc2234
-import           Network.Parser.Rfc2822           (msg_id, quoted_string, text)
+import           Network.Parser.Rfc2822 (msg_id, quoted_string, text)
 --------------------------------------------------------------------------------
 -- TODO: implement fields of rfc 822
 
@@ -147,8 +150,10 @@ mechanism = stringCI "7bit"
 
 -- * Quoted Printable
 
-safe_char :: Parser Word8
-safe_char = satisfy (\w -> (w >= 33 && w <= 60) || (w >= 62 && w <= 126))
+-- formal definition is very complex and I couldn't make it parse
+-- properly, here is an inefficient but working example
+safeChar :: Parser Word8
+safeChar = satisfy (\w -> (w >= 33 && w <= 60) || (w >= 62 && w <= 126))
 
 hexOctet :: Parser Word8
 hexOctet = ret <$> (word8 61 *> hexdig) <*> hexdig
@@ -160,31 +165,46 @@ hexOctet = ret <$> (word8 61 *> hexdig) <*> hexdig
 -- >>> parse (many (AC.char 'a') <* transportPadding) message
 -- Done "\nbbbb" "aaaa"
 transportPadding :: Parser ()
-transportPadding = lwsp >> return ()
+transportPadding = void lwsp
 
 ptext :: Parser Word8
-ptext = hexOctet <|> safe_char
+ptext = hexOctet <|> safeChar
 
-qp_section :: Parser [Word8]
-qp_section = many (ptext <|> sp <|> ht)
+qpSection :: Parser [Word8]
+qpSection = many (ptext <|> sp <|> ht)
 
-qp_segment :: Parser [Word8]
-qp_segment = ret <$> qp_section <*> many (sp <|> ht) <*> word8 61
-    where ret a [] _ = a
-          ret a _  _ = a ++ [32]
+qpSegment :: Parser [Word8]
+qpSegment = ret <$> try (qpSection <* many (sp <|> ht) <* word8 61)
+    where ret a = a ++ [32]
 
-qp_part :: Parser [Word8]
-qp_part = qp_section
+qpPart :: Parser [Word8]
+qpPart = qpSection
 
-qp_line :: Parser [Word8]
-qp_line = do
-  a <- many $ (++) <$> qp_segment <*> ((:[]) <$> (transportPadding *> crlf))
-  b <- qp_part <* transportPadding
-  return $ join a ++ b
+qpLine :: Parser [Word8]
+qpLine = do
+  a <- many $ (<>) <$> qpSegment <*> ((:[]) <$> (transportPadding *> crlf))
+  b <- qpPart <* transportPadding
+  return $ join a <> b
 
+-- >>> :set -XOverloadedStrings
+-- >>> parse quoted_printable "asd =3D=\n qwerty"
+-- Done "=\n qwerty" "asd ="
 quoted_printable :: Parser ByteString
-quoted_printable = ret <$> qp_line <*> many (crlf *> qp_line)
-  where ret x xs = pack (x ++ join xs)
+quoted_printable = ret <$> qpLine <*> many (crlf *> qpLine)
+  where ret x xs = pack (x <> join xs)
+        
+quotedPrintable :: ByteString -> ByteString
+quotedPrintable = BSC.pack . decode . BSC.unpack
+  where
+    decode :: String -> String
+    decode "" = "" -- terminal
+    decode ('=':'\n':xs) = decode xs -- sometimes we only got linefeed
+    decode ('=':'\r':'\n':xs) = decode xs
+    decode ('=':x1:x2:xs) | isHexDigit x1 && isHexDigit x2
+      = chr (digitToInt x1 * 16 + digitToInt x2) : decode xs
+    decode ('=':xs) = '=':decode xs
+    decode (x1:xs) = x1:decode xs
+{-# INLINABLE quotedPrintable #-}
 
 -- * 7.  Content-ID Header Field
 contentId :: Parser Header
