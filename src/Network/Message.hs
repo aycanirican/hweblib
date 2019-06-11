@@ -39,7 +39,6 @@ module Network.Message
 --------------------------------------------------------------------------------
 import           Data.Maybe (fromMaybe)
 import           Data.Either
-import Data.Char
 import qualified Data.List as L
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
@@ -54,7 +53,6 @@ import           Network.Parser.Rfc2183 as R2183
 import qualified Network.Parser.Rfc2046 as R2046
 import           Data.Semigroup ((<>))
 import qualified Codec.MIME.Base64 as Base64
-import qualified Codec.MIME.QuotedPrintable as QP (decode)
 --------------------------------------------------------------------------------
 -- * Types
 
