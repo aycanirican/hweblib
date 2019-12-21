@@ -1,5 +1,4 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections     #-}
 
 -- |
 -- Module      :  Network.Parser.RfcCommon
@@ -15,11 +14,24 @@
 module Network.Parser.RfcCommon where
 --------------------------------------------------------------------------------
 import           Control.Applicative
+import           Data.Functor (($>))
 import           Data.Attoparsec.ByteString as BS
+import           Data.Attoparsec.Combinator as BS
 import           Data.Word
+import           Debug.Trace (traceM)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
 --------------------------------------------------------------------------------
+
+-- | Simple debug function which prints info about read stream
+debug :: Parser a -> Parser a
+debug p = do
+  (consumed, result) <- match p
+  k <- lookAhead takeByteString
+  traceM ("consumed: "  <> show consumed
+       <> "remaining: " <> show k)
+  return result
+
 -- | Common Parsers
 ----
 
@@ -37,7 +49,7 @@ lws = ((crlf *> s) <|> s) *> return 32 <?> "lightweight space"
 -- | consecutive matches of lws rule, where they MUST be compressed to
 -- a single 0x20 byte
 lwss :: Parser Word8
-lwss = return 32 <$> many' lws
+lwss =  many' lws $> 32
 {-# INLINABLE lwss #-}
 
 -- | Parse a character but not a control or parenthesis

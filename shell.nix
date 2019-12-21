@@ -7,7 +7,7 @@ let
   f = { mkDerivation, attoparsec, base, bytestring
       , case-insensitive, containers, doctest, Glob, HUnit, mime, mtl
       , pretty-simple, scientific, stdenv, tagsoup, text, time
-      , transformers
+      , transformers, cabal-install
       }:
       mkDerivation {
         pname = "hweblib";
@@ -15,7 +15,7 @@ let
         src = ./.;
         libraryHaskellDepends = [
           attoparsec base bytestring case-insensitive containers mime mtl
-          pretty-simple scientific tagsoup text time transformers
+          pretty-simple scientific tagsoup text time transformers  cabal-install
         ];
         testHaskellDepends = [
           attoparsec base bytestring containers doctest Glob HUnit mtl

@@ -20,13 +20,12 @@ import           Control.Applicative
 import           Control.Monad (join, void)
 import           Data.Semigroup ((<>))
 import           Data.Attoparsec.ByteString
-import           Data.Attoparsec.ByteString.Char8 (decimal, stringCI, char)
+import           Data.Attoparsec.ByteString.Char8 (decimal, stringCI)
 import           Data.ByteString as BS
 import qualified Data.ByteString.Char8 as BSC
 import           Data.Map.Strict as M hiding (singleton)
 import           Data.Word (Word8)
 --------------------------------------------------------------------------------
-import           Network.Parser.Utils
 import           Network.Parser.Rfc2234
 import           Network.Parser.Rfc2822 (msg_id, quoted_string, text)
 --------------------------------------------------------------------------------

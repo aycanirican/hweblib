@@ -90,6 +90,7 @@ import           Data.Char                        (digitToInt)
 import           Data.List                        (find)
 import           Data.Monoid
 import           Data.Time
+import           Data.Functor                     (($>))
 import           Data.Word                        (Word8)
 import           Prelude                          hiding (id, take, takeWhile)
 import           Data.CaseInsensitive  ( CI )
@@ -262,11 +263,17 @@ phrase = many1 word
 
 -- >>> parse unstructured "asda sdasd asd asd\n    asdasd asd\n\n"
 -- Done "\n\n" "asda sdasd asd asd asdasd asd"
+
+-- >>> parseOnly unstructured " Thu, 12 Dec 2019 09:54:09 +0000\n"
+-- Right " Thu, 12 Dec 2019 09:54:09 +0000"
+
+-- >>> parseOnly unstructured " \n Thu, 12 Dec 2019 09:54:09 +0000\n"
+-- Right " Thu, 12 Dec 2019 09:54:09 +0000"
 unstructured :: Parser ByteString
 unstructured = do
   r1 <- many ((<>) <$> option mempty fws <*> (singleton <$> vchar))
           <* many wsp
-  return (BSC.concat r1)
+  return $ BSC.dropWhile (== ' ') $ BSC.concat r1
 
 {- * 3.3 Date and Time Specification
 
@@ -315,13 +322,13 @@ dayOfWeek = option mempty fws *> dayName
 
 dayName :: Parser Int
 dayName
-  =   AC.stringCI "Mon" *> return 0
-  <|> AC.stringCI "Tue" *> return 1
-  <|> AC.stringCI "Wed" *> return 2
-  <|> AC.stringCI "Thu" *> return 3
-  <|> AC.stringCI "Fri" *> return 4
-  <|> AC.stringCI "Sat" *> return 5
-  <|> AC.stringCI "Sun" *> return 6
+  =   AC.stringCI "Mon" $> 0
+  <|> AC.stringCI "Tue" $> 1
+  <|> AC.stringCI "Wed" $> 2
+  <|> AC.stringCI "Thu" $> 3
+  <|> AC.stringCI "Fri" $> 4
+  <|> AC.stringCI "Sat" $> 5
+  <|> AC.stringCI "Sun" $> 6
   <?> "dayName"
 
 -- >>> parseOnly date "21 Sep 1980"
@@ -338,18 +345,18 @@ day = option mempty fws *> twoDigitInt (\x -> 0<=x && x <= 31) <* fws
 
 month :: Parser Int
 month
-  =   AC.stringCI "Jan" *> pure 1
-  <|> AC.stringCI "Feb" *> pure 2
-  <|> AC.stringCI "Mar" *> pure 3
-  <|> AC.stringCI "Apr" *> pure 4
-  <|> AC.stringCI "May" *> pure 5
-  <|> AC.stringCI "Jun" *> pure 6
-  <|> AC.stringCI "Jul" *> pure 7
-  <|> AC.stringCI "Aug" *> pure 8
-  <|> AC.stringCI "Sep" *> pure 9
-  <|> AC.stringCI "Oct" *> pure 10
-  <|> AC.stringCI "Nov" *> pure 11
-  <|> AC.stringCI "Dec" *> pure 12
+  =   AC.stringCI "Jan" $> 1
+  <|> AC.stringCI "Feb" $> 2
+  <|> AC.stringCI "Mar" $> 3
+  <|> AC.stringCI "Apr" $> 4
+  <|> AC.stringCI "May" $> 5
+  <|> AC.stringCI "Jun" $> 6
+  <|> AC.stringCI "Jul" $> 7
+  <|> AC.stringCI "Aug" $> 8
+  <|> AC.stringCI "Sep" $> 9
+  <|> AC.stringCI "Oct" $> 10
+  <|> AC.stringCI "Nov" $> 11
+  <|> AC.stringCI "Dec" $> 12
   <?> "monthName"
 
 -- >>> parseOnly year "2015"
@@ -418,7 +425,7 @@ addressList :: Parser [NameAddress]
 addressList = (++) <$> address <*> (join <$> many (AC.char ',' *> address))
 
 groupList :: Parser [NameAddress]
-groupList = mailboxList <|> (cfws *> pure [])
+groupList = mailboxList <|> (cfws $> [])
 
 -- | 3.4.1.  Addr-Spec Specification
 addrSpec :: Parser ByteString
@@ -447,16 +454,34 @@ dtext = satisfy p
 
 -- 3.5.  Overall Message Syntax
 message :: Parser Message
-message = Message <$> (fields <* crlf) <*> optional body
+message = Message <$> fields <* crlf <*> optional body
 
 -- >>> A.parseOnly fields "Date: foo\n\n"
 
 -- >>> :set -XOverloadedStrings
 -- >>> parseOnly fields "Message-ID:\n <verylongstringthtat.has.dots.and@an.at.sign.com>\n"
 -- Right [("Message-ID","<verylongstringthtat.has.dots.and@an.at.sign.com>")]
-fields :: Parser [HeaderField]
-fields = many (mkHeaderField <$> (CI.mk <$> fieldName <* AC.string ":") <*> (cfws *> unstructured <* crlf))
 
+-- >>> parseOnly fields "x-ms-publictraffictype: Email\n"
+-- Right [("x-ms-publictraffictype","Email")]
+
+-- >>> parseOnly fields "X-MS-TNEF-Correlator:\nx-ms-publictraffictype: Email\n"
+-- Right [("X-MS-TNEF-Correlator",""),("x-ms-publictraffictype","Email")]
+
+-- >>> parseOnly fields "X-MS-TNEF-Correlator:\n"
+-- Right [("X-MS-TNEF-Correlator","")]
+
+-- Allow headers without any value
+fields :: Parser [HeaderField]
+fields = many headerField
+  where
+    headerField :: Parser HeaderField
+    headerField = do
+      key <- CI.mk <$> fieldName <* word8 58
+      val <- unstructured
+      _ <- crlf
+      return $ mkHeaderField key val
+      
 body :: Parser ByteString
 body = fst <$> match (text998 `sepBy` crlf)
 
@@ -546,7 +571,7 @@ resentFrom, resentTo, resentCc, resentBcc :: Parser [NameAddress]
 resentFrom   = mailboxList
 resentTo     = addressList
 resentCc     = addressList
-resentBcc    = option [] (addressList <|> (cfws *> return []))
+resentBcc    = option [] (addressList <|> (cfws $> []))
 
 resentMsgId :: Parser ByteString
 resentMsgId  = msgId

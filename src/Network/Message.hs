@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings, RecordWildCards, LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 {-  parsing emails according to Rfc 5322 and friends... -}
 
@@ -81,16 +81,12 @@ cannotParse reason msg = (reason, msg)
 
 -- * Parsing
 
--- >>> :set -XOverloadedStrings
--- >>> let parsed = Data.ByteString.readFile "/tmp/deneme/picus/samples/ets/0.txt" >>= return . either undefined id . parseMessage
--- >>> parsed >>= BS.writeFile "/tmp/webshow/msg1.hs" . Data.ByteString.Char8.pack . show
-
 parseMessage :: BS.ByteString -> Either CannotParse ParsedMessage
 parseMessage rawMessage
   = case message rawMessage of
       Left  err -> Left $ cannotParse ("Unable to parse raw message: " <> err) Nothing
       Right msg -> case body msg of
-        Nothing   -> Right $ mkParsedMessage msg []
+        Nothing      -> Right $ mkParsedMessage msg []
         Just msgbody -> case contentType msg of -- try to determine contenttype
           -- Just (ContentType "text"      "html"  ps) -> handleTextHtml etc...
           Just (ContentType "multipart" "mixed" ps) ->
