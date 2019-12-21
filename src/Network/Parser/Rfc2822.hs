@@ -16,6 +16,7 @@ module Network.Parser.Rfc2822 where
 --------------------------------------------------------------------------------
 import           Control.Applicative
 import           Control.Monad                    (join)
+import           Data.Functor                     (($>), (<$))
 import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString                  as B (ByteString, concat,
@@ -76,7 +77,7 @@ wsps = many1 wsp
 
 -- Parse Folding Whitespace
 fws :: Parser [Word8]
-fws = return [32] <$> many1 (choice [wsps, crlf *> wsps])
+fws = [32] <$ many1 (choice [wsps, crlf *> wsps])
 
 -- Parse ctext
 ctext :: Parser Word8
@@ -115,7 +116,7 @@ atom :: Parser ByteString
 atom = pack <$> (ocfws *> many1 atext <* ocfws)
 
 dot_atom_text :: Parser ByteString
-dot_atom_text = pack <$> L.intercalate [46] <$> sepBy (many1 atext) (word8 46)
+dot_atom_text = pack . L.intercalate [46] <$> sepBy (many1 atext) (word8 46)
 
 dot_atom :: Parser ByteString
 dot_atom = ocfws *> dot_atom_text <* ocfws
@@ -205,7 +206,7 @@ twoDigitInt validator = do
 -- Done "\n\n" 1980-09-21 07:31:02 UTC
 dateTime :: Parser UTCTime
 dateTime = do
-  _ <- option 0 (dayOfWeek <* AC.char ',')
+  _ <- option 0 (Network.Parser.Rfc2822.dayOfWeek <* AC.char ',')
   ((d,m,y), (tod,tz)) <- (,) <$> (date <* fws) <*> (time <* ocfws)
   let dt' = fromGregorianValid (toInteger y) m d
   case dt' of
@@ -217,13 +218,13 @@ dayOfWeek = option [] fws *> dayName
 
 dayName :: Parser Int
 dayName
-  =   AC.stringCI "Mon" *> return 0
-  <|> AC.stringCI "Tue" *> return 1
-  <|> AC.stringCI "Wed" *> return 2
-  <|> AC.stringCI "Thu" *> return 3
-  <|> AC.stringCI "Fri" *> return 4
-  <|> AC.stringCI "Sat" *> return 5
-  <|> AC.stringCI "Sun" *> return 6
+  =   AC.stringCI "Mon" $> 0
+  <|> AC.stringCI "Tue" $> 1
+  <|> AC.stringCI "Wed" $> 2
+  <|> AC.stringCI "Thu" $> 3
+  <|> AC.stringCI "Fri" $> 4
+  <|> AC.stringCI "Sat" $> 5
+  <|> AC.stringCI "Sun" $> 6
   <?> "dayName"
 
 -- >>> parseOnly date "21 Sep 1980"
@@ -243,18 +244,18 @@ month = option [] fws *> monthName <* option [] fws
 
 monthName :: Parser Int
 monthName
-  =   AC.stringCI "Jan" *> pure 1
-  <|> AC.stringCI "Feb" *> pure 2
-  <|> AC.stringCI "Mar" *> pure 3
-  <|> AC.stringCI "Apr" *> pure 4
-  <|> AC.stringCI "May" *> pure 5
-  <|> AC.stringCI "Jun" *> pure 6
-  <|> AC.stringCI "Jul" *> pure 7
-  <|> AC.stringCI "Aug" *> pure 8
-  <|> AC.stringCI "Sep" *> pure 9
-  <|> AC.stringCI "Oct" *> pure 10
-  <|> AC.stringCI "Nov" *> pure 11
-  <|> AC.stringCI "Dec" *> pure 12
+  =   AC.stringCI "Jan" $> 1
+  <|> AC.stringCI "Feb" $> 2
+  <|> AC.stringCI "Mar" $> 3
+  <|> AC.stringCI "Apr" $> 4
+  <|> AC.stringCI "May" $> 5
+  <|> AC.stringCI "Jun" $> 6
+  <|> AC.stringCI "Jul" $> 7
+  <|> AC.stringCI "Aug" $> 8
+  <|> AC.stringCI "Sep" $> 9
+  <|> AC.stringCI "Oct" $> 10
+  <|> AC.stringCI "Nov" $> 11
+  <|> AC.stringCI "Dec" $> 12
   <?> "monthName"
 
 -- >>> parseOnly day "21"
@@ -500,7 +501,7 @@ resent_from   = header "Resent-From"       (ResentFrom      <$> mailbox_list)
 resent_sender = header "Resent-Sender"     (ResentSender    <$> mailbox)
 resent_to     = header "Resent-To"         (ResentTo        <$> address_list)
 resent_cc     = header "Resent-Cc"         (ResentCc        <$> address_list)
-resent_bcc    = header "Resent-Bcc"        (ResentBcc       <$> (address_list <|> (many cfws *> return [])))
+resent_bcc    = header "Resent-Bcc"        (ResentBcc       <$> (address_list <|> (many cfws $> [])))
 resent_msg_id = header "Resent-Message-ID" (ResentMessageID <$> msg_id)
 
 -- | 3.6.7. Trace fields
