@@ -310,7 +310,7 @@ twoDigitInt validator = do
 -- Done "\n\n" 1980-09-21 07:31:02 UTC
 dateTime :: Parser UTCTime
 dateTime = do
-  _ <- option 0 (dayOfWeek <* AC.char ',')
+  _ <- option 0 (Network.Parser.Rfc5322.dayOfWeek <* AC.char ',')
   ((d,m,y), (tod,tz)) <- (,) <$> date <*> time <* ocfws
   let dt' = fromGregorianValid (toInteger y) m d
   case dt' of
