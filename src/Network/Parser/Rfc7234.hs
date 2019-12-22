@@ -9,7 +9,7 @@
 
 -- |
 -- Module      :  Network.Parser.7234
--- Copyright   :  Aycan iRiCAN, Utku Demir 2010-2015
+-- Copyright   :  Aycan iRiCAN, Utku Demir 2010-2020
 -- License     :  BSD3
 --
 -- Maintainer  :  iricanaycan@gmail.com

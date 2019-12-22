@@ -3,7 +3,7 @@
 
 -- |
 -- Module      :  Network.Parser.Mime
--- Copyright   :  Aycan iRiCAN 2010-2019
+-- Copyright   :  Aycan iRiCAN 2010-2020
 -- License     :  BSD3
 --
 -- Maintainer  :  iricanaycan@gmail.com

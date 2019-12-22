@@ -2,7 +2,7 @@
 {-# LANGUAGE TupleSections     #-}
 -- |
 -- Module      :  Network.Parser.3986
--- Copyright   :  Aycan iRiCAN 2010-2015
+-- Copyright   :  Aycan iRiCAN 2010-2020
 -- License     :  BSD3
 --
 -- Maintainer  :  iricanaycan@gmail.com
