@@ -109,7 +109,7 @@ parseMessage = do
 
   body <- case contentType hs of
     Just (R7231.MediaType "multipart" subtype xs) -> case "boundary" `lookup` xs of
-      Just b  -> Just . Composite <$> case subtype of
+      Just b  -> Just . Composite . snd <$> case subtype of
         "mixed"       -> R2046.multipartBody b
         "alternative" -> R2046.multipartBody b
         "form-data"   -> R2046.multipartBody b
@@ -137,7 +137,7 @@ mimes = do
       if (ty `elem` ["multipart/mixed", "multipart/alternative"])
       then case M.lookup "boundary" hs of
              Nothing -> pure []
-             Just b  -> (R2046.multipartBody b)
+             Just b  -> snd <$> R2046.multipartBody b
       else case M.lookup "boundary" hs of
              Nothing -> pure []
              Just _  -> R7230.asList R2046.bodyPart

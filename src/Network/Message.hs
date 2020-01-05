@@ -8,7 +8,7 @@ module Network.Message
   , mkParsedMessage
   , topLevelMessage
   , partsOfMessage
-  , CannotParse
+  , MessageParseError(..)
   , ContentType (..)
   , Message
   , MediaType
@@ -56,12 +56,13 @@ import qualified Codec.MIME.Base64 as Base64
 --------------------------------------------------------------------------------
 -- * Types
 
--- -- | A rfc5322 message
--- type Message = R5322.Message -- messageFields, messageBody
-
 -- | Parsed message consists of the main message and it's mime parts
--- also represented as list of messages
-type ParsedMessage = (Message, [Message])
+-- also represented as a list (order is insignificant atm)
+type RawMessage     = ByteString
+type RawMessageBody = ByteString
+-- type RawHeaderPart  = ByteString
+type ParsedMessage  = (Message, [Message])
+
 mkParsedMessage :: Message -> [Message] -> ParsedMessage
 mkParsedMessage = (,)
 
@@ -74,36 +75,85 @@ partsOfMessage = snd
 -- | CannotParse includes parse error as a string and a partially
 -- filled Message record, which may or may not include all of the
 -- parts of the original raw message
-type CannotParse = (String, Maybe Message)
 
-cannotParse :: String -> Maybe Message -> (String, Maybe Message)
-cannotParse reason msg = (reason, msg)
+type BoundaryText = ByteString
+
+type ParseResult a = Either (MessageParseError a) a
+
+data MessageParseError a
+  = CannotParse String (Maybe a)
+  | BoundaryNotFound Parameters
+  | BoundaryWithoutParts BoundaryText
+  | UnsupportedContentType String
+    deriving (Show)
+             
+cannotParse :: String -> Maybe a -> ParseResult a
+cannotParse s m = Left $ CannotParse s m
+
+boundaryNotFound :: Parameters -> ParseResult ParsedMessage
+boundaryNotFound = Left . BoundaryNotFound
+
+boundaryWithoutParts :: BoundaryText -> ParseResult ParsedMessage
+boundaryWithoutParts = Left . BoundaryWithoutParts
 
 -- * Parsing
 
-parseMessage :: BS.ByteString -> Either CannotParse ParsedMessage
-parseMessage rawMessage
-  = case message rawMessage of
-      Left  err -> Left $ cannotParse ("Unable to parse raw message: " <> err) Nothing
-      Right msg -> case body msg of
-        Nothing      -> Right $ mkParsedMessage msg []
-        Just msgbody -> case contentType msg of -- try to determine contenttype
-          -- Just (ContentType "text"      "html"  ps) -> handleTextHtml etc...
-          Just (ContentType "multipart" "mixed" ps) ->
-            case lookupParameter "boundary" ps of
-              Nothing    -> Left $ cannotParse "cannot find boundary in content-type header for multipart message" (Just msg) -- TODO: handle no boundary case
-              Just bndry -> case multiPartBody bndry msgbody of
-                Left err    -> Left $ cannotParse err (Just msg)
-                Right parts -> Right $ mkParsedMessage msg parts -- ParsedMessage
-          Just _ -> Right $ mkParsedMessage (msg { messageBody = Just (decodeMessage msg) }) []
-          Nothing -> Right (msg, [])
+-- Try to parse raw bytestring into a RFC 5322 Message type (no parts yet).
+parseRawMessage :: RawMessage -> ParseResult R5322.Message
+parseRawMessage rawMsg
+  = case message rawMsg of
+      Left err -> cannotParse ("Unable to parse raw Rfc5322 message: " <> err) Nothing
+      Right r  -> Right r
 
+-- >>> :set -XOverloadedStrings
+-- >>> raw <- Data.ByteString.readFile "/home/fxr/hweblib/tests/multipart-mixed-1.txt"
+-- >>> parseMessage raw
+
+-- Try to parse parts
+parse5322Message :: R5322.Message -> ParseResult ParsedMessage
+parse5322Message msg5322
+  = case body msg5322 of
+      Nothing      ->
+        Right $ mkParsedMessage msg5322 [] -- empty     message body
+      Just msgbody ->
+        case contentType msg5322 of        -- non-empty message body
+          Just (ContentType "multipart" subtype ps) ->
+            case subtype of
+              "mixed"       -> handleMultipartMixed       msg5322 ps
+              "related"     -> handleMultipartRelated     msg5322 ps 
+              "alternative" -> handleMultipartAlternative msg5322 ps
+              other         -> Left $ UnsupportedContentType ("multipart/" <> show other)
+          Just (ContentType ty subty _) -> Left $ UnsupportedContentType (show ty <> "/" <> show subty)
+          Nothing -> Right $ mkParsedMessage msg5322 []
+  where
+    handleMultipartMixed       = withBoundary
+    handleMultipartRelated     = withBoundary
+    handleMultipartAlternative = withBoundary
+
+    -- subtype unaware parsing of R5322 messages
+    withBoundary :: R5322.Message -> Parameters -> ParseResult ParsedMessage
+    withBoundary m5322@(Message _         Nothing) _       = Right $ mkParsedMessage m5322 []
+    withBoundary       (Message hdrs (Just jbody)) cparams =
+      case lookupParameter "boundary" cparams of
+         Nothing    ->
+           boundaryNotFound cparams
+         Just bndry ->
+           case multiPartBody bndry jbody of
+             Left            err -> cannotParse err Nothing
+             Right (topL, parts) -> Right $ mkParsedMessage (Message hdrs (Just topL)) parts
+                 
+parseMessage :: RawMessage -> ParseResult ParsedMessage
+parseMessage raw = case parseRawMessage raw of
+  Left  _ -> error "wrong decision dude"
+  Right m -> parse5322Message m
+  
 -- | We describe content-type header as a data type which has a
 -- media-type, a subtype and parameter list (here we use associated
 -- lists to represent them). You can use `lookupParameter` to query
 -- parameters.
-type MediaType = ByteString
-type SubType   = ByteString
+
+type MediaType  = ByteString
+type SubType    = ByteString
 type Parameters = [(ByteString, ByteString)]
 
 data ContentType
@@ -113,7 +163,6 @@ data ContentType
 defaultContentType :: ContentType
 defaultContentType = ContentType "text" "plain" [("charset", "utf8")]
 
--- | Parse a Message from given bytestring
 message :: ByteString -> Either String Message
 message = parseOnly R5322.message
 
@@ -159,10 +208,9 @@ contentLength m = case R5322.contentLengthHeader m of
 lookupParameter :: ByteString -> [(ByteString, ByteString)] -> Maybe ByteString
 lookupParameter = Prelude.lookup
 
--- | Given a boundary string, extract mime parts from message body
-multiPartBody :: ByteString -> ByteString -> Either String [Message]
+-- | Given a boundary string and message body, extract mime parts from the body part
+multiPartBody :: BoundaryText -> RawMessageBody -> Either String (ByteString, [Message])
 multiPartBody boundary = parseOnly (R2046.multipartBody boundary)
-
 
 type Body       = ByteString
 type Name       = ByteString
@@ -204,10 +252,9 @@ decodeMessage :: Message -> Body
 decodeMessage msg
   = let bdy = fromMaybe "" (messageBody msg)
     in case R5322.contentTransferEncodingHeader msg of
-      Nothing                 -> bdy
       Just "base64"           -> BS.pack . Base64.decode . BSC.unpack $ bdy
       Just "quoted-printable" -> R2045.quotedPrintable bdy -- TODO: inefficient
-      Just _                  -> bdy
+      _                       -> bdy
        
 attachments :: ParsedMessage -> [Attachment]
 attachments = Data.Either.rights . fmap attachment . partsOfMessage
@@ -219,35 +266,3 @@ attachments = Data.Either.rights . fmap attachment . partsOfMessage
 removeAngles :: ByteString -> T.Text
 removeAngles = modify . T.decodeUtf8
   where modify = T.takeWhile (/='>') . T.dropWhile (=='<') . T.dropWhile (==' ')
-
--- >>> :set -XOverloadedStrings
--- >>> let msg = R5322.Message [R5322.mkHeaderField "content-disposition" "attachment; filename=\"foo.html\""] (Just "contentz")
--- >>> attachment msg
--- Right ("foo.html",Just "contentz")
--- >>> let msgQuotedFilename = R5322.Message [R5322.mkHeaderField "content-disposition" "attachment; filename=\"foo.html\""] (Just "contentz")
--- >>> attachment msg
--- Right ("foo.html",Just "contentz")
-
--- pPrintNoColor . either error attachment.  
-
--- >>> :set -XOverloadedStrings
--- >>> import Text.Pretty.Simple (pPrint, pPrintNoColor)
--- >>> msg <- Data.ByteString.Char8.readFile "/tmp/foo-attachment"
--- >>> either show attachment $ parseMessage $ msg
--- <interactive>:144:14-23: error:
---     • Couldn't match type ‘Either String Network.Message.Attachment’
---                      with ‘[Char]’
---       Expected type: Message -> String
---         Actual type: Message -> Either String Network.Message.Attachment
---     • In the second argument of ‘either’, namely ‘attachment’
---       In the expression: either show attachment
---       In the expression: either show attachment $ parseMessage $ msg
--- <interactive>:144:27-44: error:
---     • Couldn't match type ‘(Message, [Message])’
---                      with ‘Network.Parser.Rfc5322.Message’
---       Expected type: Either UnableToParse Message
---         Actual type: Either UnableToParse ParsedMessage
---     • In the second argument of ‘($)’, namely ‘parseMessage $ msg’
---       In the expression: either show attachment $ parseMessage $ msg
---       In an equation for ‘it’:
---           it = either show attachment $ parseMessage $ msg

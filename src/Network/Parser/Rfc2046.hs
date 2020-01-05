@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE TupleSections #-}
 -- |
 -- Module      :  Network.Parser.2046
 -- Copyright   :  Aycan iRiCAN 2010-2020
@@ -15,6 +15,7 @@
 module Network.Parser.Rfc2046 where
 --------------------------------------------------------------------------------
 import           Control.Applicative
+import           Data.Functor                     (($>), void)
 import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString
@@ -25,8 +26,8 @@ import           Network.Parser.Rfc2234           (alphaPred, crlf, digitPred,
                                                    manyNtoM, octet)
 import           Network.Parser.Rfc2822           (text)
 import           Network.Parser.Rfc5322           (Message (..), fields)
+import           Network.Parser.Utils
 --------------------------------------------------------------------------------
--- >>> Prelude.map Data.Char.ord "'()+_,-./:=?"
 bcharsnospacePred :: Word8 -> Bool
 bcharsnospacePred w
   =  digitPred w
@@ -47,7 +48,7 @@ boundary = manyNtoM 0 69 bchars
 -- >>> parseOnly (dashBoundary "hebelup hodolo") "--hebelup hodolo"
 -- Right ()
 dashBoundary :: ByteString -> Parser ()
-dashBoundary str = (word8 45 *> word8 45 *> AC.string str <?> "invalid boundary") >> return ()
+dashBoundary str = void (word8 45 *> word8 45 *> AC.string str <?> "invalid boundary")
 
 encapsulation :: Parser () -> Parser Message
 encapsulation boundaryParser
@@ -68,36 +69,21 @@ bodyPart = Message <$> fields
                    <*> option Nothing (Just . pack <$> (crlf *> many octet))
 
 preamble, epilogue :: Parser Word8
-preamble = discardText *> return 0
-epilogue = discardText *> return 0
-
--- >>> c <- Prelude.readFile "test/mime-wiki.txt"
+preamble = discardText $> 0
+epilogue = discardText $> 0
 
 -- * Multipart Body Parsing
 
--- Parse a multipart message body into `Message`s
-multipartBody :: ByteString -> Parser [Message]
+multipartBody :: ByteString -> Parser (ByteString, [Message])
 multipartBody str = do
-    let sep = dashBoundary str *> transportPadding
-    _ <- manyTill octet (sep *> crlf)
-    parseTill (append' <$> many (parseTill bodyPart $ crlf <* sep <* crlf) <*> bodyPart) $ crlf <* sep <* "--"
+  bdy   <- manyTill octet begin -- throw octets until boundary w/ newline
+  parts <- parseTill (snoc' <$> many (parseTill bodyPart sep)
+                            <*> bodyPart) end
+  return (pack bdy, parts)
   where
-    append' xs x = xs ++ [x]
-
--- multipartBody2 ::ByteString -> Parser [Message]
--- multipartBody2 str = do
---   let sep = dashBoundary str *> transportPadding
---   sep <|> bodyPart
--- mimeBoundary :: Maybe ByteString -> Parser ByteString
--- mimeBoundary Nothing = pack <$> (AC.string "--" *> manyNtoM 0 69 bchars)
--- mimeBoundary (Just s) = AC.string ("--" <> s) <* skipMany (AC.char '-')
-
--- | delimit this parser to a fixed byte in order to close dos attacks
-parseTill :: Parser a -> Parser b -> Parser a
-parseTill p end = do
-  ds <- pack <$> manyTill octet end
-  case parseOnly p ds of
-    Left err  -> fail err
-    Right ret -> return ret
-
-
+    begin = void $ dashBoundary str *> transportPadding
+    sep   = void $ crlf *> begin *> crlf
+    end   = void $ crlf *> closeDelimiter begin
+    -- prepend
+    snoc' :: [a] -> a -> [a]
+    snoc' xs = (xs ++) . (:[])

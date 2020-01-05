@@ -439,11 +439,11 @@ domain :: Parser ByteString
 domain = dotAtom <|> domainLiteral
 
 domainLiteral :: Parser ByteString
-domainLiteral
-  = do _ <- ocfws >> word8 91
-       res <- BSC.concat <$> many ((<>) <$> option mempty fws *> dcontent)
-       _ <- word8 92 >> ocfws
-       return ("[" <> res <> "]")
+domainLiteral = do
+  _ <- ocfws >> word8 91
+  res <- BSC.concat <$> many ((<>) <$> option mempty fws *> dcontent)
+  _ <- word8 92 >> ocfws
+  return ("[" <> res <> "]")
 
 dcontent :: Parser ByteString
 dcontent = (pack <$> many1 dtext) <|> quotedPair
@@ -456,22 +456,20 @@ dtext = satisfy p
 message :: Parser Message
 message = Message <$> fields <* crlf <*> optional body
 
--- >>> A.parseOnly fields "Date: foo\n\n"
+-- We allow headers without any value in this implementation.
 
 -- >>> :set -XOverloadedStrings
+-- >>> parseOnly fields "Date: foo\n\n"
+-- Right [("Date","foo")]
 -- >>> parseOnly fields "Message-ID:\n <verylongstringthtat.has.dots.and@an.at.sign.com>\n"
 -- Right [("Message-ID","<verylongstringthtat.has.dots.and@an.at.sign.com>")]
-
 -- >>> parseOnly fields "x-ms-publictraffictype: Email\n"
 -- Right [("x-ms-publictraffictype","Email")]
-
 -- >>> parseOnly fields "X-MS-TNEF-Correlator:\nx-ms-publictraffictype: Email\n"
 -- Right [("X-MS-TNEF-Correlator",""),("x-ms-publictraffictype","Email")]
+-- >>> parseOnly fields "X-MS-TNEF-Correlator:\nContent-Type: text/rfc822\n"
+-- Right [("X-MS-TNEF-Correlator",""),("Content-Type","text/rfc822")]
 
--- >>> parseOnly fields "X-MS-TNEF-Correlator:\n"
--- Right [("X-MS-TNEF-Correlator","")]
-
--- Allow headers without any value
 fields :: Parser [HeaderField]
 fields = many headerField
   where

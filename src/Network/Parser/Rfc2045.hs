@@ -160,8 +160,9 @@ hexOctet = ret <$> (word8 61 *> hexdig) <*> hexdig
           toTen w | w >= 48 && w <= 57  =  fromIntegral (w - 48)
                   | w >= 97 && w <= 102 =  fromIntegral (w - 87)
                   | otherwise           =  fromIntegral (w - 55)
+
 -- >>> let message = "aaaa    \nbbbb"
--- >>> parse (many (AC.char 'a') <* transportPadding) message
+-- >>> parse (many (Data.Attoparsec.Char8.char 'a') <* transportPadding) message
 -- Done "\nbbbb" "aaaa"
 transportPadding :: Parser ()
 transportPadding = void lwsp

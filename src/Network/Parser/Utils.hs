@@ -1,4 +1,3 @@
-
 module Network.Parser.Utils
   where
 
@@ -19,6 +18,7 @@ import Data.Attoparsec.ByteString
 import Data.Attoparsec.ByteString.Char8
 import Data.Char
 import Prelude hiding (take)
+import Data.ByteString (pack)
 --------------------------------------------------------------------------------
 
 -- * Common Parsing Utilities
@@ -46,3 +46,11 @@ fixed i p = do
     case parseOnly (p <* endOfInput) intermediate of
         Left _ -> empty
         Right x -> return x
+
+-- TODO: delimit this parser
+parseTill :: Parser a -> Parser b -> Parser a
+parseTill p end = do
+  ds <- pack <$> manyTill anyWord8 end
+  case parseOnly p ds of
+    Left  err -> fail   err
+    Right ret -> return ret
