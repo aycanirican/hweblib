@@ -60,7 +60,6 @@ import qualified Codec.MIME.Base64 as Base64
 -- also represented as a list (order is insignificant atm)
 type RawMessage     = ByteString
 type RawMessageBody = ByteString
--- type RawHeaderPart  = ByteString
 type ParsedMessage  = (Message, [Message])
 
 mkParsedMessage :: Message -> [Message] -> ParsedMessage
@@ -81,14 +80,14 @@ type BoundaryText = ByteString
 type ParseResult a = Either (MessageParseError a) a
 
 data MessageParseError a
-  = CannotParse String (Maybe a)
-  | BoundaryNotFound Parameters
-  | BoundaryWithoutParts BoundaryText
+  = CannotParse String                -- general parse error
+  | BoundaryNotFound Parameters       -- boundary needed but not found
+  | BoundaryWithoutParts BoundaryText -- boundary given but no parts found 
   | UnsupportedContentType String
     deriving (Show)
              
-cannotParse :: String -> Maybe a -> ParseResult a
-cannotParse s m = Left $ CannotParse s m
+cannotParse :: String -> ParseResult a
+cannotParse s = Left $ CannotParse s
 
 boundaryNotFound :: Parameters -> ParseResult ParsedMessage
 boundaryNotFound = Left . BoundaryNotFound
@@ -98,12 +97,12 @@ boundaryWithoutParts = Left . BoundaryWithoutParts
 
 -- * Parsing
 
--- Try to parse raw bytestring into a RFC 5322 Message type (no parts yet).
-parseRawMessage :: RawMessage -> ParseResult R5322.Message
-parseRawMessage rawMsg
-  = case message rawMsg of
-      Left err -> cannotParse ("Unable to parse raw Rfc5322 message: " <> err) Nothing
-      Right r  -> Right r
+-- | There are two useful parsers given in this section. `message` is
+-- a raw Rfc5322 parser which parses headers and the raw body section
+-- of the Rfc 5322 message and returns `Message` data type.
+--
+-- The second parser gets a Rfc5322 message and tries to extract
+-- different parts of a multipart message.
 
 -- >>> :set -XOverloadedStrings
 -- >>> raw <- Data.ByteString.readFile "/home/fxr/hweblib/tests/multipart-mixed-1.txt"
@@ -139,13 +138,11 @@ parse5322Message msg5322
            boundaryNotFound cparams
          Just bndry ->
            case multiPartBody bndry jbody of
-             Left            err -> cannotParse err Nothing
-             Right (topL, parts) -> Right $ mkParsedMessage (Message hdrs (Just topL)) parts
+             Left    err -> cannotParse err
+             Right parts -> Right $ mkParsedMessage (Message hdrs Nothing) parts
                  
 parseMessage :: RawMessage -> ParseResult ParsedMessage
-parseMessage raw = case parseRawMessage raw of
-  Left  _ -> error "wrong decision dude"
-  Right m -> parse5322Message m
+parseMessage = either (cannotParse . ("Unable to parse raw Rfc5322 message: " <>)) parse5322Message . message
   
 -- | We describe content-type header as a data type which has a
 -- media-type, a subtype and parameter list (here we use associated
@@ -163,6 +160,7 @@ data ContentType
 defaultContentType :: ContentType
 defaultContentType = ContentType "text" "plain" [("charset", "utf8")]
 
+-- | Parse a `ByteString` into a Rfc5322 `Message`
 message :: ByteString -> Either String Message
 message = parseOnly R5322.message
 
@@ -209,7 +207,7 @@ lookupParameter :: ByteString -> [(ByteString, ByteString)] -> Maybe ByteString
 lookupParameter = Prelude.lookup
 
 -- | Given a boundary string and message body, extract mime parts from the body part
-multiPartBody :: BoundaryText -> RawMessageBody -> Either String (ByteString, [Message])
+multiPartBody :: BoundaryText -> RawMessageBody -> Either String [Message]
 multiPartBody boundary = parseOnly (R2046.multipartBody boundary)
 
 type Body       = ByteString
@@ -220,7 +218,7 @@ mkAttachment :: Message -> Name -> Maybe Body -> Attachment
 mkAttachment msg name bdy = (msg, name, bdy)
 
 attachmentName :: Attachment -> ByteString
-attachmentName (_, n,_) = n 
+attachmentName (_, n,_) = n
 
 attachmentBody :: Attachment -> Maybe ByteString
 attachmentBody (_,_,b) = b

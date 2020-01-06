@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
+
 -- |
 -- Module      :  Network.Parser.2046
 -- Copyright   :  Aycan iRiCAN 2010-2020
@@ -45,7 +45,7 @@ boundary :: Parser [Word8]
 boundary = manyNtoM 0 69 bchars
 
 -- >>> :set -XOverloadedStrings
--- >>> parseOnly (dashBoundary "hebelup hodolo") "--hebelup hodolo"
+-- >>> parseOnly (dashBoundary "hebelup hodolo") "--hebelup hodolo\n"
 -- Right ()
 dashBoundary :: ByteString -> Parser ()
 dashBoundary str = void (word8 45 *> word8 45 *> AC.string str <?> "invalid boundary")
@@ -74,12 +74,13 @@ epilogue = discardText $> 0
 
 -- * Multipart Body Parsing
 
-multipartBody :: ByteString -> Parser (ByteString, [Message])
+-- | Parse multipart body ( we ignore preamble given before boundary
+-- of the message body)
+multipartBody :: ByteString -> Parser [Message]
 multipartBody str = do
-  bdy   <- manyTill octet begin -- throw octets until boundary w/ newline
-  parts <- parseTill (snoc' <$> many (parseTill bodyPart sep)
-                            <*> bodyPart) end
-  return (pack bdy, parts)
+  _   <- manyTill octet begin
+  parseTill (snoc' <$> many (parseTill bodyPart sep)
+                   <*> bodyPart) end
   where
     begin = void $ dashBoundary str *> transportPadding
     sep   = void $ crlf *> begin *> crlf
