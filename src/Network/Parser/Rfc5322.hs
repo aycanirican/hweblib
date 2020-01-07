@@ -125,6 +125,7 @@ mkHeaderField name value = (mkHeaderName name, mkHeaderValue value)
 data Message
   = Message { messageFields :: [HeaderField]
             , messageBody   :: Maybe ByteString
+            , messageParts  :: [Message] -- parts for mutlipart messages
             } deriving (Eq, Show)
 
 -- * Common Accessors
@@ -454,7 +455,7 @@ dtext = satisfy p
 
 -- 3.5.  Overall Message Syntax
 message :: Parser Message
-message = Message <$> fields <* crlf <*> optional body
+message = Message <$> fields <* crlf <*> optional body <*> pure []
 
 -- We allow headers without any value in this implementation.
 

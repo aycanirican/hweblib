@@ -67,6 +67,7 @@ discardText = many line *> text
 bodyPart :: Parser Message
 bodyPart = Message <$> fields
                    <*> option Nothing (Just . pack <$> (crlf *> many octet))
+                   <*> pure []
 
 preamble, epilogue :: Parser Word8
 preamble = discardText $> 0
@@ -74,11 +75,17 @@ epilogue = discardText $> 0
 
 -- * Multipart Body Parsing
 
--- | Parse multipart body ( we ignore preamble given before boundary
--- of the message body)
+-- >>> :set -XOverloadedStrings
+-- >>> raw <- Data.ByteString.readFile "/home/fxr/hweblib/tests/multipart-mixed-1.txt"
+-- >>> fmap Prelude.length $ parseOnly (multipartBody "unique-boundary-1") raw
+-- Right 5
+
+-- | Parse multipart body consisting of interspersed parts between
+-- boundaries (we ignore preamble given before boundary of the
+-- message body).
 multipartBody :: ByteString -> Parser [Message]
 multipartBody str = do
-  _   <- manyTill octet begin
+  _     <- manyTill octet begin
   parseTill (snoc' <$> many (parseTill bodyPart sep)
                    <*> bodyPart) end
   where

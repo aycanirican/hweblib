@@ -5,9 +5,6 @@
 module Network.Message
   ( parseMessage
   , ParsedMessage
-  , mkParsedMessage
-  , topLevelMessage
-  , partsOfMessage
   , MessageParseError(..)
   , ContentType (..)
   , Message
@@ -58,42 +55,28 @@ import qualified Codec.MIME.Base64 as Base64
 
 -- | Parsed message consists of the main message and it's mime parts
 -- also represented as a list (order is insignificant atm)
-type RawMessage     = ByteString
-type RawMessageBody = ByteString
-type ParsedMessage  = (Message, [Message])
-
-mkParsedMessage :: Message -> [Message] -> ParsedMessage
-mkParsedMessage = (,)
-
-topLevelMessage :: ParsedMessage -> Message
-topLevelMessage = fst
-
-partsOfMessage :: ParsedMessage -> [Message]
-partsOfMessage = snd
+type RawMessage       = ByteString
+type RawMessageBody   = ByteString
+type RawBoundaryValue = ByteString
+type ParsedMessage    = Message
 
 -- | CannotParse includes parse error as a string and a partially
 -- filled Message record, which may or may not include all of the
 -- parts of the original raw message
 
-type BoundaryText = ByteString
+type ParseResult = Either MessageParseError Message
 
-type ParseResult a = Either (MessageParseError a) a
-
-data MessageParseError a
+data MessageParseError
   = CannotParse String                -- general parse error
   | BoundaryNotFound Parameters       -- boundary needed but not found
-  | BoundaryWithoutParts BoundaryText -- boundary given but no parts found 
   | UnsupportedContentType String
     deriving (Show)
              
-cannotParse :: String -> ParseResult a
+cannotParse :: String -> ParseResult
 cannotParse s = Left $ CannotParse s
 
-boundaryNotFound :: Parameters -> ParseResult ParsedMessage
+boundaryNotFound :: Parameters -> ParseResult
 boundaryNotFound = Left . BoundaryNotFound
-
-boundaryWithoutParts :: BoundaryText -> ParseResult ParsedMessage
-boundaryWithoutParts = Left . BoundaryWithoutParts
 
 -- * Parsing
 
@@ -109,39 +92,25 @@ boundaryWithoutParts = Left . BoundaryWithoutParts
 -- >>> parseMessage raw
 
 -- Try to parse parts
-parse5322Message :: R5322.Message -> ParseResult ParsedMessage
+parse5322Message :: R5322.Message -> ParseResult
 parse5322Message msg5322
   = case body msg5322 of
-      Nothing      ->
-        Right $ mkParsedMessage msg5322 [] -- empty     message body
-      Just msgbody ->
-        case contentType msg5322 of        -- non-empty message body
-          Just (ContentType "multipart" subtype ps) ->
-            case subtype of
-              "mixed"       -> handleMultipartMixed       msg5322 ps
-              "related"     -> handleMultipartRelated     msg5322 ps 
-              "alternative" -> handleMultipartAlternative msg5322 ps
-              other         -> Left $ UnsupportedContentType ("multipart/" <> show other)
-          Just (ContentType ty subty _) -> Left $ UnsupportedContentType (show ty <> "/" <> show subty)
-          Nothing -> Right $ mkParsedMessage msg5322 []
-  where
-    handleMultipartMixed       = withBoundary
-    handleMultipartRelated     = withBoundary
-    handleMultipartAlternative = withBoundary
-
-    -- subtype unaware parsing of R5322 messages
-    withBoundary :: R5322.Message -> Parameters -> ParseResult ParsedMessage
-    withBoundary m5322@(Message _         Nothing) _       = Right $ mkParsedMessage m5322 []
-    withBoundary       (Message hdrs (Just jbody)) cparams =
-      case lookupParameter "boundary" cparams of
-         Nothing    ->
-           boundaryNotFound cparams
-         Just bndry ->
-           case multiPartBody bndry jbody of
-             Left    err -> cannotParse err
-             Right parts -> Right $ mkParsedMessage (Message hdrs Nothing) parts
+      Nothing      -> Right msg5322  -- empty body
+      Just rawbody -> 
+        case contentType msg5322 of  -- non-empty message body, possible parts
+          Just (ContentType "multipart" _ ps) ->
+            case lookupParameter "boundary" ps of
+              Nothing       -> Right msg5322
+              Just rawbndry ->
+                case multiPartBody rawbndry rawbody of
+                  Left _   -> Right msg5322   -- cannot parse multipart body
+                  Right ms -> Right msg5322 {
+                      messageParts = rights $ Prelude.map parse5322Message ms
+                    }
+          Just ContentType{} -> Right msg5322 -- not a multipart message
+          Nothing            -> Right msg5322 -- no content type
                  
-parseMessage :: RawMessage -> ParseResult ParsedMessage
+parseMessage :: RawMessage -> ParseResult
 parseMessage = either (cannotParse . ("Unable to parse raw Rfc5322 message: " <>)) parse5322Message . message
   
 -- | We describe content-type header as a data type which has a
@@ -207,7 +176,7 @@ lookupParameter :: ByteString -> [(ByteString, ByteString)] -> Maybe ByteString
 lookupParameter = Prelude.lookup
 
 -- | Given a boundary string and message body, extract mime parts from the body part
-multiPartBody :: BoundaryText -> RawMessageBody -> Either String [Message]
+multiPartBody :: RawBoundaryValue -> RawMessageBody -> Either String [Message]
 multiPartBody boundary = parseOnly (R2046.multipartBody boundary)
 
 type Body       = ByteString
@@ -255,7 +224,7 @@ decodeMessage msg
       _                       -> bdy
        
 attachments :: ParsedMessage -> [Attachment]
-attachments = Data.Either.rights . fmap attachment . partsOfMessage
+attachments = Data.Either.rights . fmap attachment . messageParts
 
 -- * Utilities
 
