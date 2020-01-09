@@ -127,7 +127,7 @@ data Message
             , messageBody   :: Maybe ByteString
             , messageParts  :: [Message] -- parts for mutlipart messages
             } deriving (Eq, Show)
-
+  
 -- * Common Accessors
 lookupHeader :: HeaderName -> Message -> Maybe HeaderField
 lookupHeader name msg = find ((== name) . headerName) (messageFields msg)
@@ -470,6 +470,8 @@ message = Message <$> fields <* crlf <*> optional body <*> pure []
 -- Right [("X-MS-TNEF-Correlator",""),("x-ms-publictraffictype","Email")]
 -- >>> parseOnly fields "X-MS-TNEF-Correlator:\nContent-Type: text/rfc822\n"
 -- Right [("X-MS-TNEF-Correlator",""),("Content-Type","text/rfc822")]
+-- >>> parseOnly fields "Content-Type: multipart/alternative; boundary=\"MCBoundary=_11912230343231881\"\n"
+-- Right [("Content-Type","multipart/alternative; boundary=\"MCBoundary=_11912230343231881\"")]
 
 fields :: Parser [HeaderField]
 fields = many headerField

@@ -4,7 +4,6 @@
 
 module Network.Message
   ( parseMessage
-  , ParsedMessage
   , MessageParseError(..)
   , ContentType (..)
   , Message
@@ -53,30 +52,18 @@ import qualified Codec.MIME.Base64 as Base64
 --------------------------------------------------------------------------------
 -- * Types
 
--- | Parsed message consists of the main message and it's mime parts
--- also represented as a list (order is insignificant atm)
 type RawMessage       = ByteString
 type RawMessageBody   = ByteString
 type RawBoundaryValue = ByteString
-type ParsedMessage    = Message
-
--- | CannotParse includes parse error as a string and a partially
--- filled Message record, which may or may not include all of the
--- parts of the original raw message
-
 type ParseResult = Either MessageParseError Message
 
 data MessageParseError
   = CannotParse String                -- general parse error
-  | BoundaryNotFound Parameters       -- boundary needed but not found
   | UnsupportedContentType String
     deriving (Show)
              
 cannotParse :: String -> ParseResult
-cannotParse s = Left $ CannotParse s
-
-boundaryNotFound :: Parameters -> ParseResult
-boundaryNotFound = Left . BoundaryNotFound
+cannotParse = Left . CannotParse
 
 -- * Parsing
 
@@ -84,14 +71,9 @@ boundaryNotFound = Left . BoundaryNotFound
 -- a raw Rfc5322 parser which parses headers and the raw body section
 -- of the Rfc 5322 message and returns `Message` data type.
 --
--- The second parser gets a Rfc5322 message and tries to extract
--- different parts of a multipart message.
+-- The second parser `parseMessage` gets a Rfc5322 message and tries
+-- to extract parts of it if it is a multipart message.
 
--- >>> :set -XOverloadedStrings
--- >>> raw <- Data.ByteString.readFile "/home/fxr/hweblib/tests/multipart-mixed-1.txt"
--- >>> parseMessage raw
-
--- Try to parse parts
 parse5322Message :: R5322.Message -> ParseResult
 parse5322Message msg5322
   = case body msg5322 of
@@ -103,13 +85,15 @@ parse5322Message msg5322
               Nothing       -> Right msg5322
               Just rawbndry ->
                 case multiPartBody rawbndry rawbody of
-                  Left _   -> Right msg5322   -- cannot parse multipart body
-                  Right ms -> Right msg5322 {
-                      messageParts = rights $ Prelude.map parse5322Message ms
-                    }
+                  Left  _  -> Right msg5322   -- cannot parse multipart body
+                  Right ms ->
+                    Right msg5322 { messageBody  = Nothing -- We ignore preamble here
+                                  , messageParts = rights $ Prelude.map parse5322Message ms
+                                  }
           Just ContentType{} -> Right msg5322 -- not a multipart message
           Nothing            -> Right msg5322 -- no content type
-                 
+
+-- | First parse Rfc5322 message and then try to parse mime parts
 parseMessage :: RawMessage -> ParseResult
 parseMessage = either (cannotParse . ("Unable to parse raw Rfc5322 message: " <>)) parse5322Message . message
   
@@ -223,7 +207,7 @@ decodeMessage msg
       Just "quoted-printable" -> R2045.quotedPrintable bdy -- TODO: inefficient
       _                       -> bdy
        
-attachments :: ParsedMessage -> [Attachment]
+attachments :: Message -> [Attachment]
 attachments = Data.Either.rights . fmap attachment . messageParts
 
 -- * Utilities
