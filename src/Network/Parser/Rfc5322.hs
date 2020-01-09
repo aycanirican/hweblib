@@ -127,7 +127,7 @@ data Message
             , messageBody   :: Maybe ByteString
             , messageParts  :: [Message] -- parts for mutlipart messages
             } deriving (Eq, Show)
-  
+
 -- * Common Accessors
 lookupHeader :: HeaderName -> Message -> Maybe HeaderField
 lookupHeader name msg = find ((== name) . headerName) (messageFields msg)

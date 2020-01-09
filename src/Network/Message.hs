@@ -29,6 +29,8 @@ module Network.Message
   , attachmentName
   , attachmentBody
   , decodeMessage
+  , flattenParts
+  , findParts
   )
   where
 
@@ -217,3 +219,17 @@ attachments = Data.Either.rights . fmap attachment . messageParts
 removeAngles :: ByteString -> T.Text
 removeAngles = modify . T.decodeUtf8
   where modify = T.takeWhile (/='>') . T.dropWhile (=='<') . T.dropWhile (==' ')
+
+-- | Flatten nested parts into a list
+
+-- >>> :set -XOverloadedStrings
+-- >>> flattenParts (Message [] (Just "root") [Message [] (Just "fst") [], Message [] (Just "snd") []])
+-- [Message {messageFields = [], messageBody = Just "fst", messageParts = []},Message {messageFields = [], messageBody = Just "snd", messageParts = []}]
+
+flattenParts :: Message -> [Message]
+flattenParts msg@(Message _ _ []) = [msg]
+flattenParts (Message _ _ parts ) = L.concatMap flattenParts parts
+
+-- | Find parts whose matching the predicate `pred'`
+findParts :: (Message -> Bool) -> Message -> [Message]
+findParts pred' msg = L.filter pred' (flattenParts msg)
