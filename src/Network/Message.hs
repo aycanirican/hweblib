@@ -231,5 +231,15 @@ flattenParts msg@(Message _ _ []) = [msg]
 flattenParts (Message _ _ parts ) = L.concatMap flattenParts parts
 
 -- | Find parts whose matching the predicate `pred'`
+
+-- >>> :set -XOverloadedStrings
+-- >>> hdr1 = R5322.mkHeaderField "From" "iricanaycan@gmail.com"
+-- >>> msg = (Message [] (Just "root") [Message [] (Just "fst") [], Message [hdr1] (Just "snd") []])
+-- >>> p1 = (== (Just "snd")) . messageBody
+-- >>> findParts p1 msg
+-- [Message {messageFields = [("From","iricanaycan@gmail.com")], messageBody = Just "snd", messageParts = []}]
+-- >>> p2 = (== []) . messageFields
+-- >>> findParts p2 msg
+-- [Message {messageFields = [], messageBody = Just "fst", messageParts = []}]
 findParts :: (Message -> Bool) -> Message -> [Message]
 findParts pred' msg = L.filter pred' (flattenParts msg)
