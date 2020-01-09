@@ -6,7 +6,7 @@ module Network.Message
   ( parseMessage
   , MessageParseError(..)
   , ContentType (..)
-  , Message
+  , Message (..)
   , MediaType
   , SubType
   , Parameters
