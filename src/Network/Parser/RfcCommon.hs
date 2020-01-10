@@ -19,6 +19,7 @@ import           Data.Attoparsec.ByteString as BS
 import           Data.Attoparsec.Combinator as BS
 import           Data.Word
 import           Debug.Trace (traceM)
+import           Data.Semigroup ((<>))
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
 --------------------------------------------------------------------------------
