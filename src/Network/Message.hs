@@ -222,13 +222,22 @@ removeAngles = modify . T.decodeUtf8
 
 -- | Flatten nested parts into a list
 
+-- Should flatten one root and two children
 -- >>> :set -XOverloadedStrings
 -- >>> flattenParts (Message [] (Just "root") [Message [] (Just "fst") [], Message [] (Just "snd") []])
--- [Message {messageFields = [], messageBody = Just "fst", messageParts = []},Message {messageFields = [], messageBody = Just "snd", messageParts = []}]
+-- [Message {messageFields = [], messageBody = Just "root", messageParts = []},Message {messageFields = [], messageBody = Just "fst", messageParts = []},Message {messageFields = [], messageBody = Just "snd", messageParts = []}]
+
+-- Should flatten two levels
+-- >>> r2 = Message { messageFields = [], messageBody = Just "root-2", messageParts = [    ] }
+-- >>> r1 = Message { messageFields = [], messageBody = Just "root-1", messageParts = [ r2 ] }
+-- >>> root = Message { messageFields = [], messageBody = Just "root", messageParts = [ r1 ] }
+-- >>> flattenParts root
+-- [Message {messageFields = [], messageBody = Just "root", messageParts = []},Message {messageFields = [], messageBody = Just "root-1", messageParts = []},Message {messageFields = [], messageBody = Just "root-2", messageParts = []}]
+
 
 flattenParts :: Message -> [Message]
 flattenParts msg@(Message _ _ []) = [msg]
-flattenParts (Message _ _ parts ) = L.concatMap flattenParts parts
+flattenParts (Message h b parts ) = (Message h b []): L.concatMap flattenParts parts
 
 -- | Find parts whose matching the predicate `pred'`
 
