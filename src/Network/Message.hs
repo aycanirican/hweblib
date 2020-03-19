@@ -208,9 +208,13 @@ decodeMessage msg
       Just "base64"           -> BS.pack . Base64.decode . BSC.unpack $ bdy
       Just "quoted-printable" -> R2045.quotedPrintable bdy -- TODO: inefficient
       _                       -> bdy
-       
+
+-- >>> :set -XOverloadedStrings
+-- >>> msg = Message {messageFields = [("From","a@a.com"),("To","b@b.com"),("Subject","test_subject")], messageBody = Nothing, messageParts = [Message {messageFields = [("Content-Type","text/plain; charset=utf-8")], messageBody = Just "Message body", messageParts = [Message {messageFields = [("Content-Disposition","attachment; filename=example.html")], messageBody = Just "example attachment", messageParts = []}]}]}
+-- >>> attachments msg
+-- [(Message {messageFields = [("Content-Disposition","attachment; filename=example.html")], messageBody = Just "example attachment", messageParts = []},"example.html",Just "example attachment")]
 attachments :: Message -> [Attachment]
-attachments = Data.Either.rights . fmap attachment . messageParts
+attachments = Data.Either.rights . fmap attachment . flattenParts
 
 -- * Utilities
 
