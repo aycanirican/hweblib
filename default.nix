@@ -4,7 +4,7 @@
 }:
 mkDerivation {
   pname = "hweblib";
-  version = "0.8.0";
+  version = "0.8.3";
   src = ./.;
   libraryHaskellDepends = [
     attoparsec base bytestring case-insensitive containers mime mtl

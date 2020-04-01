@@ -82,7 +82,11 @@ parse5322Message msg5322
       Nothing      -> Right msg5322  -- empty body
       Just rawbody -> 
         case contentType msg5322 of  -- non-empty message body, possible parts
-          Just (ContentType "multipart" _ ps) ->
+          Just (ContentType "message"   "rfc822" _) ->
+            case parseMessage rawbody of
+              Left  _   -> Right msg5322 -- cannot parse message/rfc822 type message
+              Right msg -> Right msg
+          Just (ContentType "multipart" _        ps) ->
             case lookupParameter "boundary" ps of
               Nothing       -> Right msg5322
               Just rawbndry ->
