@@ -78,8 +78,8 @@ epilogue = void discardText
 -- message body).
 multipartBody :: ByteString -> Parser [Message]
 multipartBody str = do
-  _     <- manyTill octet begin -- ignore preamble
-  parseTill (snoc' <$> many (parseTill bodyPart sep)
+  _     <- manyTill' octet begin -- ignore preamble
+  parseTill (snoc' <$> many' (parseTill bodyPart sep)
                    <*> bodyPart) end
   where
     begin = void $ dashBoundary str >> transportPadding >> crlf

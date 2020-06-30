@@ -50,7 +50,7 @@ fixed i p = do
 -- TODO: delimit this parser
 parseTill :: Parser a -> Parser b -> Parser a
 parseTill p end = do
-  ds <- pack <$> manyTill anyWord8 end
+  ds <- pack <$> manyTill' anyWord8 end
   case parseOnly p ds of
     Left  err -> fail   err
     Right ret -> return ret
