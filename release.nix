@@ -15,17 +15,17 @@ let
   version = gitSource.gitTag;
   });
   };
-  
+
   systems = ["x86_64-linux" "i686-linux" "x86_64-darwin"];
-  compilers = ["ghc784"];
+  compilers = ["ghc882" "ghc865" "ghc8101" ];
 
   jobs = rec {
     build = pkgs.lib.genAttrs systems (system:
-    
+
       with import <nixpkgs> { inherit system; };
       haskellPackages = pkgs.lib.getAttrFromPath ["haskell-ng" "packages" ghcVer] pkgs;
-            
-            
+
+
     );
   }
 

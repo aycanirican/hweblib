@@ -21,9 +21,10 @@ import           Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString
 import qualified Data.ByteString.Char8            as BSC
-import           Data.Monoid                      (mempty, (<>))
 import           Data.Word                        (Word8)
 import           Prelude                          hiding (take, takeWhile)
+import           Data.Semigroup                   ((<>))
+import           Data.Monoid                      (mempty)
 --------------------------------------------------------------------------------
 import           Network.Parser.Rfc2234
 import           Network.Types

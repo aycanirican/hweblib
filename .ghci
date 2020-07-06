@@ -1,1 +1,9 @@
 :set -isrc:test:.
+:set -no-user-package-db
+:set -fno-warn-unused-do-bind
+:set -fwarn-incomplete-patterns
+:set -Wall
+:set -fwarn-tabs
+:set -fwarn-incomplete-record-updates
+:set -fno-warn-name-shadowing
+:set -fno-warn-type-defaults

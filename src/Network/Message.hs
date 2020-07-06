@@ -43,14 +43,13 @@ import qualified Data.Text.Encoding as T
 import           Data.Attoparsec.ByteString
 import           Data.Attoparsec.ByteString.Char8 as AC
 import           Data.ByteString as BS
-import           Data.ByteString.Char8 as BSC
 import qualified Network.Parser.Rfc5322 as R5322
 import           Network.Parser.Rfc5322 ( Message (..) )
 import qualified Network.Parser.Rfc2045 as R2045
 import           Network.Parser.Rfc2183 as R2183
 import qualified Network.Parser.Rfc2046 as R2046
-import           Data.Semigroup ((<>))
-import qualified Codec.MIME.Base64 as Base64
+import           Data.Semigroup ()
+import qualified Data.ByteString.Base64 as Base64
 --------------------------------------------------------------------------------
 -- * Types
 
@@ -63,7 +62,7 @@ data MessageParseError
   = CannotParse String                -- general parse error
   | UnsupportedContentType String
     deriving (Show)
-             
+
 cannotParse :: String -> ParseResult
 cannotParse = Left . CannotParse
 
@@ -80,7 +79,7 @@ parse5322Message :: R5322.Message -> ParseResult
 parse5322Message msg5322
   = case body msg5322 of
       Nothing      -> Right msg5322  -- empty body
-      Just rawbody -> 
+      Just rawbody ->
         case contentType msg5322 of  -- non-empty message body, possible parts
           Just (ContentType "message"   "rfc822" _) ->
             case parseMessage rawbody of
@@ -102,7 +101,7 @@ parse5322Message msg5322
 -- | First parse Rfc5322 message and then try to parse mime parts
 parseMessage :: RawMessage -> ParseResult
 parseMessage = either (cannotParse . ("Unable to parse raw Rfc5322 message: " <>)) parse5322Message . message
-  
+
 -- | We describe content-type header as a data type which has a
 -- media-type, a subtype and parameter list (here we use associated
 -- lists to represent them). You can use `lookupParameter` to query
@@ -209,7 +208,7 @@ decodeMessage :: Message -> Body
 decodeMessage msg
   = let bdy = fromMaybe "" (messageBody msg)
     in case R5322.contentTransferEncodingHeader msg of
-      Just "base64"           -> BS.pack . Base64.decode . BSC.unpack $ bdy
+      Just "base64"           -> Base64.decodeLenient bdy
       Just "quoted-printable" -> R2045.quotedPrintable bdy -- TODO: inefficient
       _                       -> bdy
 
