@@ -14,28 +14,37 @@
 -- <http://www.ietf.org/rfc/rfc5646.txt>
 
 module Network.Parser.Rfc5646 where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Control.Monad
-import           Data.Attoparsec.ByteString       as A
-import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString                  as B hiding (count, singleton)
-import           Data.Word
-import           Data.Semigroup ((<>))
 
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc5234
---------------------------------------------------------------------------------
+import Control.Applicative (Alternative (many, (<|>)))
+import Control.Monad (join)
+import Data.Attoparsec.ByteString as A
+  ( Parser,
+    count,
+    many1,
+    option,
+    satisfy,
+    word8,
+  )
+import qualified Data.Attoparsec.ByteString.Char8 as AC
+import Data.ByteString as B
+  ( ByteString,
+    concat,
+    cons,
+    pack,
+  )
+import Data.Word (Word8)
+import Network.Parser.Rfc5234 (alpha, digit, manyNtoM)
+
 -- * 2.1.  Syntax
 
--- >>> parseOnly language_tag "de"
+-- >>> parseOnly languageTag "de"
 -- Right "de"
--- >>> parseOnly language_tag "zh-Hans"
+-- >>> parseOnly languageTag "zh-Hans"
 -- Right "zh-Hans"
--- >>> parseOnly language_tag "x-whatever"
+-- >>> parseOnly languageTag "x-whatever"
 -- Right "x-whatever"
-language_tag :: Parser ByteString
-language_tag = langtag <|> privateuse <|> grandfather
+languageTag :: Parser ByteString
+languageTag = langtag <|> privateuse <|> grandfather
 
 langtag :: Parser ByteString
 langtag
@@ -45,11 +54,12 @@ langtag
         <*> many (B.cons 45 <$> (A.word8 45 *> variant))
         <*> many (B.cons 45 <$> (A.word8 45 *> extension))
         <*> option mempty (B.cons 45 <$> (A.word8 45 *> privateuse))
-  where ret a b c ds es f = a <> b <> c <> (B.concat ds) <> (B.concat es) <> f
+  where 
+    ret a b c ds es f = a <> b <> c <> B.concat ds <> B.concat es <> f
 
 language :: Parser ByteString
 language = (<>) <$> (pack <$> manyNtoM 2 3 alpha)
-                <*> option mempty ((B.cons 45) <$> (A.word8 45 *> extlang))
+                <*> option mempty (B.cons 45 <$> (A.word8 45 *> extlang))
 
 {-
   Original definition was:
@@ -67,7 +77,7 @@ extlang :: Parser ByteString
 extlang
   = ret <$> count 3 alpha
         <*> (join . fmap (45:)
-             <$> (manyNtoM 1 2 (A.word8 45 *> count 3 alpha)))
+             <$> manyNtoM 1 2 (A.word8 45 *> count 3 alpha))
   where ret xs ys = pack (xs ++ ys)
 
 script :: Parser ByteString
@@ -105,35 +115,35 @@ grandfather = irregular <|> regular
 
 irregular :: Parser ByteString
 irregular
-  = AC.string "en-GB-oed"
-    <|> AC.string "i-ami"
-    <|> AC.string "i-bnn"
-    <|> AC.string "i-default"
-    <|> AC.string "i-enochian"
-    <|> AC.string "i-hak"
-    <|> AC.string "i-klingon"
-    <|> AC.string "i-lux"
-    <|> AC.string "i-mingo"
-    <|> AC.string "i-navajo"
-    <|> AC.string "i-pwn"
-    <|> AC.string "i-tao"
-    <|> AC.string "i-tay"
-    <|> AC.string "i-tsu"
-    <|> AC.string "sgn-BE-FR"
-    <|> AC.string "sgn-BE-NL"
-    <|> AC.string "sgn-CH-DE"
+    = AC.string "en-GB-oed"
+  <|> AC.string "i-ami"
+  <|> AC.string "i-bnn"
+  <|> AC.string "i-default"
+  <|> AC.string "i-enochian"
+  <|> AC.string "i-hak"
+  <|> AC.string "i-klingon"
+  <|> AC.string "i-lux"
+  <|> AC.string "i-mingo"
+  <|> AC.string "i-navajo"
+  <|> AC.string "i-pwn"
+  <|> AC.string "i-tao"
+  <|> AC.string "i-tay"
+  <|> AC.string "i-tsu"
+  <|> AC.string "sgn-BE-FR"
+  <|> AC.string "sgn-BE-NL"
+  <|> AC.string "sgn-CH-DE"
 
 regular :: Parser ByteString
 regular
-  = AC.string "art-lojban"
-    <|> AC.string "cel-gaulish"
-    <|> AC.string "no-bok"
-    <|> AC.string "no-nyn"
-    <|> AC.string "zh-guoyu"
-    <|> AC.string "zh-hakka"
-    <|> AC.string "zh-min"
-    <|> AC.string "zh-min-nan"
-    <|> AC.string "zh-xiang"
+    = AC.string "art-lojban"
+  <|> AC.string "cel-gaulish"
+  <|> AC.string "no-bok"
+  <|> AC.string "no-nyn"
+  <|> AC.string "zh-guoyu"
+  <|> AC.string "zh-hakka"
+  <|> AC.string "zh-min"
+  <|> AC.string "zh-min-nan"
+  <|> AC.string "zh-xiang"
 
 alphanum :: Parser Word8
 alphanum = alpha <|> digit

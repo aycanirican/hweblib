@@ -12,14 +12,22 @@ module Network.Parser.Utils
 --
 -- Common Utilities for Parsers
 
---------------------------------------------------------------------------------
 import Control.Applicative
+  ( Alternative (empty, (<|>)),
+  )
 import Data.Attoparsec.ByteString
-import Data.Attoparsec.ByteString.Char8
-import Data.Char
-import Prelude hiding (take)
+  ( Parser,
+    anyWord8,
+    count,
+    endOfInput,
+    manyTill',
+    parseOnly,
+    take,
+  )
+import Data.Attoparsec.ByteString.Char8 (digit)
 import Data.ByteString (pack)
---------------------------------------------------------------------------------
+import Data.Char (digitToInt)
+import Prelude hiding (take)
 
 -- * Common Parsing Utilities
 

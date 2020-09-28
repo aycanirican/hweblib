@@ -12,17 +12,34 @@
 -- This module provides common parsers used in rfc specifications.
 
 module Network.Parser.RfcCommon where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Functor (($>))
-import           Data.Attoparsec.ByteString as BS
-import           Data.Attoparsec.Combinator as BS
-import           Data.Word
-import           Debug.Trace (traceM)
-import           Data.Semigroup ((<>))
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc2234
---------------------------------------------------------------------------------
+
+import Control.Applicative (Alternative ((<|>)))
+import Data.Attoparsec.ByteString as BS
+  ( Parser,
+    many',
+    many1,
+    match,
+    satisfy,
+    takeByteString,
+    word8,
+    (<?>),
+  )
+import Data.Attoparsec.Combinator as BS
+  ( lookAhead,
+  )
+import Data.Functor (($>))
+import Data.Word (Word8)
+import Debug.Trace (traceM)
+import Network.Parser.Rfc2234
+  ( char,
+    charPred,
+    crlf,
+    ctlPred,
+    dquotePred,
+    hexdig,
+    ht,
+    sp,
+  )
 
 -- | Simple debug function which prints info about read stream
 debug :: Parser a -> Parser a

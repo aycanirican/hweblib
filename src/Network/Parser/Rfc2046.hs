@@ -13,24 +13,37 @@
 -- <http://www.ietf.org/rfc/rfc2046.txt>
 
 module Network.Parser.Rfc2046 where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Functor                     (void)
-import           Data.Attoparsec.ByteString
+
+import Control.Applicative (Alternative (many, (<|>)))
+import Data.Attoparsec.ByteString
+  ( Parser,
+    inClass,
+    many',
+    manyTill',
+    option,
+    satisfy,
+    word8,
+    (<?>),
+  )
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString
-import           Data.Word                        (Word8)
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc2045           (transportPadding)
-import           Network.Parser.Rfc2234           (alphaPred, crlf, digitPred,
-                                                   manyNtoM, octet)
-import           Network.Parser.Rfc2822           (text)
-import           Network.Parser.Rfc5322           (Message (..), message)
-import           Network.Parser.Utils             (parseTill)
---------------------------------------------------------------------------------
+import Data.ByteString (ByteString)
+import Data.Functor (void)
+import Data.Word (Word8)
+import Network.Parser.Rfc2045 (transportPadding)
+import Network.Parser.Rfc2234
+  ( alphaPred,
+    crlf,
+    digitPred,
+    manyNtoM,
+    octet,
+  )
+import Network.Parser.Rfc2822 (text)
+import Network.Parser.Rfc5322 (Message (..), message)
+import Network.Parser.Utils (parseTill)
+
 bcharsnospacePred :: Word8 -> Bool
 bcharsnospacePred w
-  =  digitPred w
+   = digitPred w
   || alphaPred w
   || inClass "'()+_,./:=?-" w
 

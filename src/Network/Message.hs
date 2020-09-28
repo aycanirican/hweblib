@@ -34,23 +34,34 @@ module Network.Message
   )
   where
 
---------------------------------------------------------------------------------
-import           Data.Maybe (fromMaybe)
-import           Data.Either
+import Data.Attoparsec.ByteString
+  ( Parser,
+    many',
+    many1,
+    parseOnly,
+    word8,
+  )
+import Data.Attoparsec.ByteString.Char8 as AC
+  ( digit,
+  )
+import Data.ByteString as BS (ByteString, pack)
+import qualified Data.ByteString.Base64 as Base64
+import Data.Either (rights)
 import qualified Data.List as L
+import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as T
-import           Data.Attoparsec.ByteString
-import           Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString as BS
-import qualified Network.Parser.Rfc5322 as R5322
-import           Network.Parser.Rfc5322 ( Message (..) )
 import qualified Network.Parser.Rfc2045 as R2045
-import           Network.Parser.Rfc2183 as R2183
 import qualified Network.Parser.Rfc2046 as R2046
-import           Data.Semigroup ()
-import qualified Data.ByteString.Base64 as Base64
---------------------------------------------------------------------------------
+import Network.Parser.Rfc2183 as R2183
+  ( Disposition (dispositionParameters, dispositionType),
+    DispositionParameter (Filename),
+    DispositionType (Attachment),
+    dispositionParser,
+  )
+import Network.Parser.Rfc5322 (Message (..))
+import qualified Network.Parser.Rfc5322 as R5322
+
 -- * Types
 
 type RawMessage       = ByteString
@@ -244,7 +255,7 @@ removeAngles = modify . T.decodeUtf8
 
 flattenParts :: Message -> [Message]
 flattenParts msg@(Message _ _ []) = [msg]
-flattenParts (Message h b parts ) = (Message h b []): L.concatMap flattenParts parts
+flattenParts (Message h b parts ) = Message h b []: L.concatMap flattenParts parts
 
 -- | Find parts whose matching the predicate `pred'`
 

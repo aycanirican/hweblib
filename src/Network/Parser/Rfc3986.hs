@@ -14,21 +14,26 @@
 --  TODO: implement ipv6 and ipvfuture
 
 module Network.Parser.Rfc3986 where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Control.Monad
-import           Data.Attoparsec.ByteString
+
+import Control.Applicative (Alternative (many, (<|>)))
+import Control.Monad (join)
+import Data.Attoparsec.ByteString
+  ( Parser,
+    inClass,
+    many1,
+    match,
+    option,
+    satisfy,
+    try,
+    word8,
+  )
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString
-import qualified Data.ByteString.Char8            as BSC
-import           Data.Word                        (Word8)
-import           Prelude                          hiding (take, takeWhile)
-import           Data.Semigroup                   ((<>))
-import           Data.Monoid                      (mempty)
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc2234
-import           Network.Types
---------------------------------------------------------------------------------
+import Data.ByteString (ByteString, pack)
+import qualified Data.ByteString.Char8 as BSC
+import Data.Word (Word8)
+import Network.Parser.Rfc2234 (alpha, digit, hexdigPred)
+import Network.Types (URI (..), URIAuth (..))
+import Prelude hiding (take, takeWhile)
 
 subDelims :: Parser Word8
 subDelims =  satisfy $ inClass "!$&'()*+,;="

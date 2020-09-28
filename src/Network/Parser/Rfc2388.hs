@@ -14,30 +14,31 @@
 -- <http://www.ietf.org/rfc/rfc2388.txt>
 
 module Network.Parser.Rfc2388 where
---------------------------------------------------------------------------------
-import Control.Applicative
-import Data.Attoparsec.ByteString
+import Control.Applicative (Alternative (many, (<|>)))
+import Data.Attoparsec.ByteString (Parser)
 import Data.Attoparsec.ByteString.Char8 (char, stringCI)
-----------------------------------------------------------------------
-import qualified Network.Parser.Rfc2183 as R2183 ( dispositionParamParser
-                                                 , dispositionTypeParser
-                                                 , Disposition (..), DispositionType (..))
-import Network.Parser.Rfc2234 hiding (char)
---------------------------------------------------------------------------------
+import Data.Functor (($>))
+import Network.Parser.Rfc2183
+  ( Disposition (..),
+    DispositionType (..),
+    dispositionParamParser,
+    dispositionTypeParser,
+  )
+import Network.Parser.Rfc2234 (lwsp)
 
 -- | 3. Definition of multipart/form-data
 
 -- >>> parseOnly disposition "Content-Disposition: form-data; name=\"user\""
 -- Right (Disposition {dispType = DispFormData, dispParams = [OtherParam "name" "user"]})
-disposition :: Parser R2183.Disposition
+disposition :: Parser Disposition
 disposition
   = do _ <- stringCI "Content-Disposition:" >> lwsp
-       (ty, xs) <- (,) <$> R2183.dispositionTypeParser <*> many (char ';' >> lwsp *> R2183.dispositionParamParser)
-       return $ R2183.Disposition ty xs
+       (ty, xs) <- (,) <$> dispositionTypeParser <*> many (char ';' >> lwsp *> dispositionParamParser)
+       return $ Disposition ty xs
 
-dispositionType :: Parser R2183.DispositionType
+dispositionType :: Parser DispositionType
 dispositionType
-  =   R2183.dispositionTypeParser
-  <|> stringCI "form-data" *> return R2183.FormData
+  =   dispositionTypeParser
+  <|> stringCI "form-data" $> FormData
 
 

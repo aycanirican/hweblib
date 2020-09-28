@@ -7,7 +7,6 @@ import           Data.Attoparsec.ByteString
 import           Data.Attoparsec.ByteString.Char8
 import           Data.ByteString
 import           Network.Parser.Permute
-
 import           Data.Functor
 
 data MyData

@@ -15,13 +15,11 @@
 -- <http://www.ietf.org/rfc/rfc7235.txt>
 
 module Network.Parser.Rfc7235 where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Attoparsec.ByteString       as BS
-import           Data.Attoparsec.ByteString.Char8 as AC
-import           Data.Attoparsec.Combinator
-import           Data.ByteString
---------------------------------------------------------------------------------
---------------------------------------------------------------------------------
+
+import Control.Applicative
+import Data.Attoparsec.ByteString as BS
+import Data.Attoparsec.ByteString.Char8 as AC
+import Data.Attoparsec.Combinator
+import Data.ByteString
 
 -- TODO: implement it....

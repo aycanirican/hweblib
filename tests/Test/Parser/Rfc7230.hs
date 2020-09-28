@@ -2,20 +2,26 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Parser.Rfc7230 where
---------------------------------------------------------------------------------
-import           Data.Attoparsec.ByteString
-import           Data.ByteString
-import           Test.HUnit
-import           Test.Parser.Parser
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc2234
-import           Network.Parser.Rfc7230
-import           Network.Parser.RfcCommon
-import           Network.Types
---------------------------------------------------------------------------------
+
+import Data.Attoparsec.ByteString (parseOnly)
+import Data.ByteString (ByteString)
+import Network.Parser.Rfc7230
+  ( HTTPMessage (HTTPMessage, body, headers, status),
+    RequestTarget (AsteriskForm, OriginForm),
+    StartLine (RequestLine, StatusLine),
+    httpMessage,
+    requestLine,
+  )
+import Network.Types
+  ( HTTPVersion (HTTPVersion, httpMajor, httpMinor),
+  )
+import Test.HUnit (Assertion, Test (TestCase, TestList))
+import Test.Parser.Parser (ae)
+
 tests :: Test
 tests = TestList $ fmap TestCase lst
 
+lst :: [Assertion]
 lst = [ testAsteriskFormRequestLine
       , testAbsolutePathRequestLine
       , testRequestWithQuery
@@ -24,25 +30,29 @@ lst = [ testAsteriskFormRequestLine
       , testSimpleResponse
       ]
 
+testAsteriskFormRequestLine :: Assertion
 testAsteriskFormRequestLine
   = ae "AsteriskFormRequestLine"
     (Right (RequestLine "GET" AsteriskForm (HTTPVersion {httpMajor = 1, httpMinor = 1})))
-    (parseOnly request_line "GET * HTTP/1.1\n")
+    (parseOnly requestLine "GET * HTTP/1.1\n")
 
+testAbsolutePathRequestLine :: Assertion
 testAbsolutePathRequestLine
   = ae "AbsolutePathRequestLine"
   (Right (RequestLine "GET"
           (OriginForm "/index.html" "")
           (HTTPVersion {httpMajor = 1, httpMinor = 1})))
-  (parseOnly request_line "GET /index.html HTTP/1.1\n")
+  (parseOnly requestLine "GET /index.html HTTP/1.1\n")
 
+testRequestWithQuery :: Assertion
 testRequestWithQuery
   = ae "RequestWithQuert"
     (Right (RequestLine "GET"
             (OriginForm "/my.cgi" "foo=bar&john=doe")
             (HTTPVersion {httpMajor = 1, httpMinor = 1})))
-    (parseOnly request_line "GET /my.cgi?foo=bar&john=doe HTTP/1.1\n")
+    (parseOnly requestLine "GET /my.cgi?foo=bar&john=doe HTTP/1.1\n")
 
+testGetRequestWithHeaders :: Assertion
 testGetRequestWithHeaders
   = ae "GetRequestWithHeaders"
     (Right (HTTPMessage { status = RequestLine "GET"
@@ -58,9 +68,9 @@ testGetRequestWithHeaders
                                     , ("Connection","keep-alive")
                                     ]
                         , body = Nothing }))
-    (parseOnly http_message getData1)
+    (parseOnly httpMessage getData1)
 
-
+testGetRequestWithQuery :: Assertion
 testGetRequestWithQuery
   = ae "GetRequestWithQuery"
     (Right (HTTPMessage { status = RequestLine "GET"
@@ -75,7 +85,7 @@ testGetRequestWithQuery
                                     , ("Connection","keep-alive") ]
                         , body = Nothing }))
 
-    (parseOnly http_message getData2)
+    (parseOnly httpMessage getData2)
 
 responseString :: ByteString
 responseString = "HTTP/1.1 200 OK\r\n\
@@ -84,13 +94,14 @@ responseString = "HTTP/1.1 200 OK\r\n\
                  \\r\n\
                  \Heartbeat OK!\r\n"
 
+testSimpleResponse :: Assertion
 testSimpleResponse
   = ae "SimpleResponse"
     (Right (HTTPMessage { status = StatusLine (HTTPVersion {httpMajor = 1, httpMinor = 1}) "200" "OK"
                         , headers = [ ("Content-Type","text/plain")
                                     , ("Content-Length","13") ]
                         , body = Just "Heartbeat OK!\r\n"}))
-    (parseOnly http_message responseString)
+    (parseOnly httpMessage responseString)
 
 -- Data
 getData1 :: ByteString

@@ -78,28 +78,30 @@ module Network.Parser.Rfc5322
   , optionalField
   )
   where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Control.Monad                    (join)
-import           Data.Attoparsec.ByteString
+
+import Control.Applicative
+import Control.Monad (join)
+import Data.Attoparsec.ByteString
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString                  (ByteString, cons, pack,
-                                                   singleton)
-import qualified Data.ByteString.Char8            as BSC
-import           Data.Char                        (digitToInt)
-import           Data.List                        (find)
-import           Data.Monoid
-import           Data.Time
-import           Data.Functor                     (($>))
-import           Data.Word                        (Word8)
-import           Prelude                          hiding (id, take, takeWhile)
-import           Data.CaseInsensitive  ( CI )
+import Data.ByteString
+  ( ByteString,
+    cons,
+    pack,
+    singleton,
+  )
+import qualified Data.ByteString.Char8 as BSC
+import Data.CaseInsensitive (CI)
 import qualified Data.CaseInsensitive as CI
---------------------------------------------------------------------------------
-import qualified Network.Parser.Rfc2822           as R2822
-import           Network.Parser.Rfc5234
-import qualified Network.Parser.RfcCommon         as RfcCommon
---------------------------------------------------------------------------------
+import Data.Char (digitToInt)
+import Data.Functor (($>))
+import Data.List (find)
+import Data.Monoid
+import Data.Time
+import Data.Word (Word8)
+import qualified Network.Parser.Rfc2822 as R2822
+import Network.Parser.Rfc5234
+import qualified Network.Parser.RfcCommon as RfcCommon
+import Prelude hiding (id, take, takeWhile)
 
 -- * Interface
 
@@ -257,7 +259,7 @@ qcontent = pack <$> (RfcCommon.asList qtext <|> RfcCommon.quotedPair)
 
 -- | * 3.2.5.  Miscellaneous Tokens
 word :: Parser ByteString
-word = atom <|> R2822.quoted_string
+word = atom <|> R2822.quotedString
 
 phrase :: Parser [ByteString]
 phrase = many1 word
@@ -434,7 +436,7 @@ addrSpec = ret <$> localPart <* AC.char '@' <*> domain
   where ret l r = l <> "@" <> r
 
 localPart :: Parser ByteString
-localPart = dotAtom <|> R2822.quoted_string
+localPart = dotAtom <|> R2822.quotedString
 
 domain :: Parser ByteString
 domain = dotAtom <|> domainLiteral
@@ -521,7 +523,7 @@ replyTo = addressList
 to, cc, bcc :: Parser [NameAddress]
 to  = addressList
 cc  = addressList
-bcc = option [] (addressList <|> (cfws *> return []))
+bcc = option [] (addressList <|> (cfws $> []))
 
 -- | 3.6.4. Identification fields
 messageId :: Parser ByteString

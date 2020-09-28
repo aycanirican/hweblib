@@ -4,7 +4,6 @@ import           Control.Monad
 import           Data.Attoparsec.ByteString
 import           Data.ByteString.Char8      (pack)
 import           Network.Socket
---------------------------------------------------------------------------------
 import           Network.Http
 --------------------------------------------------------------------------------
 

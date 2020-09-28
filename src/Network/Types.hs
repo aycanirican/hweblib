@@ -16,12 +16,12 @@ module Network.Types
        , HttpError(..)
 
        ) where
---------------------------------------------------------------------------------
-import           Control.Exception
-import           Data.ByteString.Char8
-import           Data.Typeable
-import qualified GHC.Generics          as GHC
---------------------------------------------------------------------------------
+
+import Control.Exception (Exception)
+import Data.ByteString.Char8 (ByteString)
+import Data.Typeable (Typeable)
+import qualified GHC.Generics as GHC
+
 -- | HTTP Version holds major and minor numbers.
 data HTTPVersion =
   HTTPVersion { httpMajor :: Int
@@ -161,7 +161,7 @@ data URIAuth = URIAuth
     } deriving (Eq, Show)
 
 -- | HTTP error.
-data HttpError
+newtype HttpError
     = InvalidRequestError { httpErrorMessage :: String }
       deriving (Eq, Typeable)
 

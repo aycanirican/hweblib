@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE TupleSections      #-}
 
 -- |
 -- Module      :  Network.Parser.7231
@@ -17,33 +16,26 @@
 -- <http://www.ietf.org/rfc/rfc7231.txt>
 
 module Network.Parser.Rfc7231 where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Attoparsec.ByteString       as BS
-import           Data.Attoparsec.ByteString.Char8 as AC
 
-import           Data.ByteString
-
-import           Data.Monoid
-import           Data.Scientific
-import           Data.Time
-import           Data.Typeable
-import qualified GHC.Generics                     as GHC
-import           Prelude                          hiding (product)
---------------------------------------------------------------------------------
-import qualified Network.Parser.Rfc3986           as R3986
-import qualified Network.Parser.Rfc4647           as R4647
-import           Network.Parser.Rfc5234
-import qualified Network.Parser.Rfc5322           as R5322
-import qualified Network.Parser.Rfc5646           as R5646
-import           Network.Parser.Rfc7230
-import           Network.Parser.Utils
-import           Network.Types
--- import           Network.Parser.Mime
--- import qualified Network.Parser.Rfc2183           as R2183
--- import           Network.Parser.Rfc2822           (comment, msg_id, text)
--- import           Network.Parser.RfcCommon         hiding (text)
---------------------------------------------------------------------------------
+import Control.Applicative
+import Data.Attoparsec.ByteString as BS
+import Data.Attoparsec.ByteString.Char8 as AC
+import Data.ByteString
+import Data.Monoid
+import Data.Scientific
+import Data.Time
+import Data.Typeable
+import GHC.Generics (Generic)
+import qualified Network.Parser.Rfc3986 as R3986
+import qualified Network.Parser.Rfc4647 as R4647
+import Network.Parser.Rfc5234
+import qualified Network.Parser.Rfc5322 as R5322
+import qualified Network.Parser.Rfc5646 as R5646
+import Network.Parser.Rfc7230
+import Network.Parser.Utils
+import Network.Types
+import Prelude hiding (product)
+import Data.Functor (($>))
 
 -- | 3.1.  Representation Metadata
 
@@ -55,15 +47,14 @@ import           Network.Types
      parameter      = token "=" ( token / quoted-string )
 -}
 
-data MediaType
-  = MediaType ByteString ByteString [(ByteString, ByteString)]
-    deriving (Eq,Show,GHC.Generic,Typeable)
+data MediaType = MediaType ByteString ByteString [(ByteString, ByteString)]
+  deriving (Eq,Show,Generic,Typeable)
 
 -- |
--- >>> parseOnly media_type "multipart/form-data; boundary=------------------------d380791e8587bb9a"
+-- >>> parseOnly mediaType "multipart/form-data; boundary=------------------------d380791e8587bb9a"
 -- Right (MediaType "multipart" "form-data" [("boundary","------------------------d380791e8587bb9a")])
-media_type :: Parser MediaType
-media_type = MediaType <$> type_ <* AC.char '/'
+mediaType :: Parser MediaType
+mediaType = MediaType <$> type_ <* AC.char '/'
              <*> subtype
              <*> many (ows *> AC.char ';' *> ows *> parameter)
 type_, subtype :: Parser ByteString
@@ -82,25 +73,25 @@ charset = token
      Content-Type = media-type
 -}
 
-content_type :: Parser MediaType
-content_type = media_type
+contentType :: Parser MediaType
+contentType = mediaType
 
 -- * 3.1.2. Encoding for Compression or Integrity
 -- * 3.1.2.1. Content Codings
 
-content_coding :: Parser ByteString
-content_coding = token
+contentCoding :: Parser ByteString
+contentCoding = token
 
 -- * 3.1.2.2.  Content-Encoding
-content_encoding :: Parser [ByteString]
-content_encoding = dash1 content_coding
+contentEncoding :: Parser [ByteString]
+contentEncoding = dash1 contentCoding
 
 
 -- * 3.1.3.  Audience Language
 
 -- * 3.1.3.1.  Language Tags
-language_tag :: Parser ByteString
-language_tag = R5646.language_tag
+languageTag :: Parser ByteString
+languageTag = R5646.languageTag
 
 -- * 3.1.3.2.  Content-Language
 
@@ -108,8 +99,8 @@ language_tag = R5646.language_tag
 Content-Language = 1#language-tag
 -}
 
-content_language :: Parser [ByteString]
-content_language = dash1 language_tag
+contentLanguage :: Parser [ByteString]
+contentLanguage = dash1 languageTag
 
 -- * 3.1.4.  Identification
 
@@ -120,8 +111,8 @@ Content-Location = absolute-URI / partial-URI
 -}
 
 -- TODO: add partial_uri
-content_location :: Parser URI
-content_location = R3986.absoluteUri -- <|> partial-URI
+contentLocation :: Parser URI
+contentLocation = R3986.absoluteUri -- <|> partial-URI
 
 
 -- * 5.1.1.  Expect
@@ -164,7 +155,7 @@ accept-ext = OWS ";" OWS token [ "=" ( token / quoted-string ) ]
 
 
 accept :: Parser [MediaType]
-accept = dash media_type
+accept = dash mediaType
 
 -- * 5.3.3.  Accept-Charset
 
@@ -173,8 +164,8 @@ Accept-Charset = 1#( ( charset / "*" ) [ weight ] )
 -}
 
 
-accept_charset :: Parser [(ByteString, Maybe Scientific)]
-accept_charset = dash1 $ (,) <$> (charset <|> "*") <*> option Nothing (Just <$> weight)
+acceptCharset :: Parser [(ByteString, Maybe Scientific)]
+acceptCharset = dash1 $ (,) <$> (charset <|> "*") <*> optional weight
 
 -- * 5.3.4.  Accept-Encoding
 
@@ -183,11 +174,11 @@ Accept-Encoding  = #( codings [ weight ] )
 codings          = content-coding / "identity" / "*"
 -}
 
-accept_encoding :: Parser [(ByteString, Maybe Scientific)]
-accept_encoding = dash ((,) <$> codings <*> option Nothing (Just <$> weight))
+acceptEncoding :: Parser [(ByteString, Maybe Scientific)]
+acceptEncoding = dash ((,) <$> codings <*> optional weight)
 
 codings :: Parser ByteString
-codings = content_coding <|> "identity" <|> "*"
+codings = contentCoding <|> "identity" <|> "*"
 
 -- * 5.3.5.  Accept-Language
 
@@ -195,8 +186,8 @@ codings = content_coding <|> "identity" <|> "*"
 Accept-Language = 1#( language-range [ weight ] )
 -}
 
-accept_language :: Parser [(ByteString, Maybe Scientific)]
-accept_language = dash1 ((,) <$> R4647.language_range <*> option Nothing (Just <$> weight))
+acceptLanguage :: Parser [(ByteString, Maybe Scientific)]
+acceptLanguage = dash1 ((,) <$> R4647.languageRange <*> optional weight)
 
 -- * 5.4.  Authentication Credentials
 {-
@@ -236,20 +227,19 @@ referer = R3986.absoluteUri
 -- * 5.5.3.  User-Agent
 
 -- |
--- >>> parse user_agent "CERN-LineMode/2.15 libwww/2.17b3\n"
+-- >>> parse userAgent "CERN-LineMode/2.15 libwww/2.17b3\n"
 -- Done "\n" ["CERN-LineMode/2.15","libwww/2.17b3"]
--- >>> parse user_agent "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/602.1.29 (KHTML, like Gecko) Version/9.1.1 Safari/601.6.17\n"
+-- >>> parse userAgent "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_4) AppleWebKit/602.1.29 (KHTML, like Gecko) Version/9.1.1 Safari/601.6.17\n"
 -- Done "\n" ["Mozilla/5.0","(Macintosh; Intel Mac OS X 10_11_4)","AppleWebKit/602.1.29","(KHTML, like Gecko)","Version/9.1.1","Safari/601.6.17"]
-user_agent :: Parser [ByteString]
-user_agent = (:) <$> product
-                 <*> (many (rws *> (product <|> comment)))
+userAgent :: Parser [ByteString]
+userAgent = (:) <$> product <*> many (rws *> (product <|> comment))
 
 product :: Parser ByteString
 product = (\a b -> a <> "/" <> b) <$> token
-                                  <*> option mempty (AC.char '/' *> product_version)
+                                  <*> option mempty (AC.char '/' *> productVersion)
 
-product_version :: Parser ByteString
-product_version = token
+productVersion :: Parser ByteString
+productVersion = token
 
 -- * 7.  Response Header Fields
 -- * 7.1.  Control Data
@@ -274,31 +264,30 @@ product_version = token
 -- TODO: implement obs_date
 
 -- |
--- >>> parse http_date "Fri, 31 Dec 1999 23:59:59 GMT\n"
+-- >>> parse httpDate "Fri, 31 Dec 1999 23:59:59 GMT\n"
 -- Done "\n" 1999-12-31 23:59:59 UTC
-http_date :: Parser UTCTime
-http_date = imf_fixdate -- <|> obs_date
+httpDate :: Parser UTCTime
+httpDate = imfFixdate -- <|> obs_date
 
-imf_fixdate :: Parser UTCTime
-imf_fixdate
-  = do _ <- day_name >> AC.char ',' >> sp
-       ((d,m,y), tod) <- (,) <$> date1 <* sp
-                             <*> time_of_day <* sp <* AC.string "GMT"
-       let dt' = fromGregorianValid (toInteger y) m d
-       case dt' of
-         Just dt -> return . zonedTimeToUTC $ ZonedTime (LocalTime dt tod) utc
-         Nothing -> fail "invalid date"
+imfFixdate :: Parser UTCTime
+imfFixdate = do 
+  _ <- dayName >> AC.char ',' >> sp
+  ((d,m,y), tod) <- (,) <$> date1 <* sp
+                        <*> timeOfDay <* sp <* AC.string "GMT"
+  let dt' = fromGregorianValid (toInteger y) m d
+  case dt' of
+    Just dt -> return . zonedTimeToUTC $ ZonedTime (LocalTime dt tod) utc
+    Nothing -> fail "invalid date"
 
-day_name :: Parser Int
-day_name
-  =   AC.string "Mon" *> pure 0
-  <|> AC.string "Tue" *> pure 1
-  <|> AC.string "Wed" *> pure 2
-  <|> AC.string "Thu" *> pure 3
-  <|> AC.string "Fri" *> pure 4
-  <|> AC.string "Sat" *> pure 5
-  <|> AC.string "Sun" *> pure 6
-  <?> "dayName"
+dayName :: Parser Int
+dayName = (AC.string "Mon" $> 0)
+      <|> (AC.string "Tue" $> 1)
+      <|> (AC.string "Wed" $> 2)
+      <|> (AC.string "Thu" $> 3)
+      <|> (AC.string "Fri" $> 4)
+      <|> (AC.string "Sat" $> 5)
+      <|> (AC.string "Sun" $> 6)
+      <?> "dayName"
 
 date1 :: Parser (Int, Int, Int)
 date1 = (,,) <$> nDigitInt 2 (\x -> x >= 0 && x <= 31) <* sp
@@ -306,23 +295,22 @@ date1 = (,,) <$> nDigitInt 2 (\x -> x >= 0 && x <= 31) <* sp
              <*> nDigitInt 4 (\x -> x >= 0 && x <= 2060)
 
 month :: Parser Int
-month
-  =   AC.stringCI "Jan" *> pure 1
-  <|> AC.stringCI "Feb" *> pure 2
-  <|> AC.stringCI "Mar" *> pure 3
-  <|> AC.stringCI "Apr" *> pure 4
-  <|> AC.stringCI "May" *> pure 5
-  <|> AC.stringCI "Jun" *> pure 6
-  <|> AC.stringCI "Jul" *> pure 7
-  <|> AC.stringCI "Aug" *> pure 8
-  <|> AC.stringCI "Sep" *> pure 9
-  <|> AC.stringCI "Oct" *> pure 10
-  <|> AC.stringCI "Nov" *> pure 11
-  <|> AC.stringCI "Dec" *> pure 12
-  <?> "monthName"
+month = (AC.stringCI "Jan" $> 1)
+    <|> (AC.stringCI "Feb" $> 2)
+    <|> (AC.stringCI "Mar" $> 3)
+    <|> (AC.stringCI "Apr" $> 4)
+    <|> (AC.stringCI "May" $> 5)
+    <|> (AC.stringCI "Jun" $> 6)
+    <|> (AC.stringCI "Jul" $> 7)
+    <|> (AC.stringCI "Aug" $> 8)
+    <|> (AC.stringCI "Sep" $> 9)
+    <|> (AC.stringCI "Oct" $> 10)
+    <|> (AC.stringCI "Nov" $> 11)
+    <|> (AC.stringCI "Dec" $> 12)
+    <?> "monthName"
 
-time_of_day :: Parser TimeOfDay
-time_of_day = do
+timeOfDay :: Parser TimeOfDay
+timeOfDay = do
   (h,m,s) <- (,,) <$> nDigitInt 2 zerotwentyfourP <* AC.char ':'
                   <*> nDigitInt 2 zerosixtyP      <* AC.char ':'
                   <*> nDigitInt 2 zerosixtyP
@@ -333,7 +321,7 @@ time_of_day = do
 
 -- * 7.1.1.2.  Date
 date :: Parser UTCTime
-date = http_date
+date = httpDate
 
 -- * 7.1.2.  Location
 location :: Parser URI
@@ -342,15 +330,15 @@ location = R3986.uriReference
 -- * 7.1.3.  Retry-After
 
 -- |
--- >>> parse retry_after "Fri, 31 Dec 1999 23:59:59 GMT\n"
+-- >>> parse retryAfter "Fri, 31 Dec 1999 23:59:59 GMT\n"
 -- Done "\n" (Left 1999-12-31 23:59:59 UTC)
--- >>> parse retry_after "3600\n"
+-- >>> parse retryAfter "3600\n"
 -- Done "\n" (Right 3600)
-retry_after :: Parser (Either UTCTime Int)
-retry_after = eitherP http_date delay_seconds
+retryAfter :: Parser (Either UTCTime Int)
+retryAfter = eitherP httpDate delaySeconds
 
-delay_seconds :: Parser Int
-delay_seconds = read <$> many1 AC.digit
+delaySeconds :: Parser Int
+delaySeconds = read <$> many1 AC.digit
 
 -- * 7.1.4.  Vary
 
@@ -362,7 +350,7 @@ data Star = Star deriving Show
 -- >>> parseOnly vary "accept-encoding, accept-language"
 -- Right (Right ["accept-encoding","accept-language"])
 vary :: Parser (Either Star [ByteString])
-vary = eitherP (AC.char '*' *> pure Star) (dash1 field_name)
+vary = eitherP (AC.char '*' $> Star) (dash1 fieldName)
 
 -- * 7.2.  Validator Header Fields
 -- implemented in 7232

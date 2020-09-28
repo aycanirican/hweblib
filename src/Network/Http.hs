@@ -3,22 +3,26 @@
 module Network.Http
   where
 
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Control.Monad
-import           Data.Attoparsec.ByteString
-import           Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString                  hiding (elem, foldl')
-import           Data.List
-import qualified Data.Map.Strict                  as M
---------------------------------------------------------------------------------
-import qualified Network.Parser.Rfc2045           as R2045
-import qualified Network.Parser.Rfc2046           as R2046
-import qualified Network.Parser.Rfc5234           as R5234
-import qualified Network.Parser.Rfc5322           as R5322
-import qualified Network.Parser.Rfc7230           as R7230
-import qualified Network.Parser.Rfc7231           as R7231
---------------------------------------------------------------------------------
+import Control.Applicative (Alternative ((<|>)))
+import Control.Monad (replicateM)
+import Data.Attoparsec.ByteString
+  ( Parser,
+    anyWord8,
+    many',
+    word8,
+  )
+import Data.Attoparsec.ByteString.Char8 as AC
+  ( string,
+  )
+import Data.ByteString (ByteString, pack)
+import Data.List (foldl')
+import qualified Data.Map.Strict as M
+import qualified Network.Parser.Rfc2045 as R2045
+import qualified Network.Parser.Rfc2046 as R2046
+import qualified Network.Parser.Rfc5234 as R5234
+import qualified Network.Parser.Rfc5322 as R5322
+import qualified Network.Parser.Rfc7230 as R7230
+import qualified Network.Parser.Rfc7231 as R7231
 
 -- contentType :: Request -> Maybe ByteString
 -- contentType = ehContentType . entityHeaders . rqHeaders
@@ -97,13 +101,13 @@ data Entity = Discrete ByteString
 
 parseMessage :: Parser (R7230.StartLine, HTTPHeaders, Maybe Entity)
 parseMessage = do
-  sl <- R7230.start_line
+  sl <- R7230.startLine
   fs <- many' $ (\i h -> h { contentLength=Just i })
-                  <$> header "Content-Length" R7230.content_length
+                  <$> header "Content-Length" R7230.contentLength
             <|> (\i h -> h { contentType=Just i })
-                  <$> header "Content-Type" R7231.content_type
+                  <$> header "Content-Type" R7231.contentType
             <|> (\i h -> h { otherHeaders = i : otherHeaders h } )
-                  <$> R7230.header_field <* R5234.crlf
+                  <$> R7230.headerField <* R5234.crlf
   let hs = foldl' (flip ($)) emptyHTTPHeaders fs
   _ <- R5234.crlf
 
@@ -134,7 +138,7 @@ mimes = do
   case cType ehdrs of
     Nothing       -> fail "No content-type defined in entity headers"
     Just (ty, hs) ->
-      if (ty `elem` ["multipart/mixed", "multipart/alternative"])
+      if ty `elem` ["multipart/mixed", "multipart/alternative"]
       then case M.lookup "boundary" hs of
              Nothing -> pure []
              Just b  -> R2046.multipartBody b
@@ -142,7 +146,7 @@ mimes = do
              Nothing -> pure []
              Just _  -> R7230.asList R2046.bodyPart
   where
-    cType :: [R2045.Header] -> Maybe (ByteString, (M.Map ByteString ByteString))
+    cType :: [R2045.Header] -> Maybe (ByteString, M.Map ByteString ByteString)
     cType headers
       = let chs = Prelude.filter ((== R2045.ContentH) . R2045.hType) headers
         in case chs of

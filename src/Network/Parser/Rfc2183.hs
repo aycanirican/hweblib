@@ -23,21 +23,22 @@ module Network.Parser.Rfc2183
   , sizeParamParser
   , quotedDateTimeParser
   ) where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Attoparsec.ByteString
-import           Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString
-import qualified Data.Text                        as T
-import qualified Data.Text.Encoding               as E
-import           Data.Time
-import           Data.Semigroup                   ((<>))
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc2045           (extensionToken, parameter,
-                                                   value)
-import           Network.Parser.Rfc2234           (lwsp)
-import           Network.Parser.Rfc2822           (dateTime)
---------------------------------------------------------------------------------
+
+import Control.Applicative (Alternative (many, (<|>)))
+import Data.Attoparsec.ByteString (Parser, many1, (<?>))
+import Data.Attoparsec.ByteString.Char8 as AC (char, digit, stringCI)
+import Data.ByteString (ByteString)
+import Data.Functor (($>))
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as E
+import Data.Time (UTCTime)
+import Network.Parser.Rfc2045
+  ( extensionToken,
+    parameter,
+    value,
+  )
+import Network.Parser.Rfc2234 (lwsp)
+import Network.Parser.Rfc2822 (dateTime)
 
 -- | A Disposition has a type and list of parameters
 data Disposition
@@ -71,12 +72,12 @@ dispositionParser :: Parser Disposition
 dispositionParser
   = Disposition <$> (lwsp *> dispositionTypeParser)
                 <*> many (";" *> lwsp  *> dispositionParamParser)
-    
+
 -- | Note: implementation of multipart/form-data is defined in Rfc2388
 dispositionTypeParser :: Parser DispositionType
 dispositionTypeParser
-  =   AC.stringCI "inline"     *> return Inline
-  <|> AC.stringCI "attachment" *> return Attachment
+    = (AC.stringCI "inline"     $> Inline)
+  <|> (AC.stringCI "attachment" $> Attachment)
   <|> (OtherDisposition . E.decodeLatin1 <$> extensionToken)
 
 -- >>> :set -XOverloadedStrings
@@ -86,7 +87,7 @@ dispositionTypeParser
 -- Right (ModDate 1997-02-12 21:29:51 UTC)
 dispositionParamParser :: Parser DispositionParameter
 dispositionParamParser
-  = nameParm <|> filenameParm <|> creationDateParm <|> modificationDateParm <|> readDateParm <|> myParameter
+    = nameParm <|> filenameParm <|> creationDateParm <|> modificationDateParm <|> readDateParm <|> myParameter
   where
     myParameter :: Parser DispositionParameter
     myParameter = do

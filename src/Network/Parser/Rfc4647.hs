@@ -14,15 +14,14 @@
 -- <http://www.ietf.org/rfc/rfc4647.txt>
 
 module Network.Parser.Rfc4647 where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Attoparsec.ByteString       as BS
-import           Data.Attoparsec.ByteString.Char8 as AC hiding (digit)
-import           Data.ByteString
-import           Data.Word
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc5234
---------------------------------------------------------------------------------
+
+import Control.Applicative (Alternative (many, (<|>)))
+import Data.Attoparsec.ByteString as BS (Parser)
+import Data.Attoparsec.ByteString.Char8 as AC (char)
+import Data.ByteString (ByteString, pack)
+import Data.Word (Word8)
+import Data.Functor (($>))
+import Network.Parser.Rfc5234 (alpha, digit, manyNtoM)
 
 -- * 2.1.  Basic Language Range
 
@@ -30,18 +29,18 @@ import           Network.Parser.Rfc5234
    language-range   = (1*8ALPHA *("-" 1*8alphanum)) / "*"
    alphanum         = ALPHA / DIGIT
 -}
-language_range :: Parser ByteString
-language_range
-  = (ret <$> aterm
-     <*> many ((45:) <$> (AC.char '-' *> anterm)))
-    <|> (AC.char '*' *> return (pack [42]))
+languageRange :: Parser ByteString
+languageRange
+    = (ret <$> aterm
+           <*> many ((45:) <$> (AC.char '-' *> anterm)))
+  <|> (AC.char '*' $> pack [42])
   where
-    aterm = manyNtoM 1 8 alpha
-    anterm = manyNtoM 1 8 alphanum
-    ret x xs = pack (x ++ (Prelude.concat xs))
+    aterm    = manyNtoM 1 8 alpha
+    anterm   = manyNtoM 1 8 alphaNum
+    ret x xs = pack (x ++ Prelude.concat xs)
 
-alphanum :: Parser Word8
-alphanum = alpha <|> digit
+alphaNum :: Parser Word8
+alphaNum = alpha <|> digit
 
 -- * 2.2.  Extended Language Range
 {- TODO

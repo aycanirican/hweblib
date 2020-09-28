@@ -1,16 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module Test.Parser.Rfc3986 where
---------------------------------------------------------------------------------
-import           Data.Attoparsec.ByteString
-import           Data.ByteString
-import           Network.Parser.RfcCommon
-import           Test.HUnit
-import           Test.Parser.Parser
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc3986
-import           Network.Types
---------------------------------------------------------------------------------
+
+import Data.Attoparsec.ByteString (parseOnly)
+import Network.Parser.Rfc3986 (query, uri)
+import Network.Types
+  ( URI
+      ( URI,
+        uriAuthority,
+        uriFragment,
+        uriPath,
+        uriQuery,
+        uriScheme
+      ),
+    URIAuth (URIAuth, uriPort, uriRegName, uriUserInfo),
+  )
+import Test.HUnit
+  ( Assertion,
+    Test (TestCase, TestList),
+    assertEqual,
+  )
+import Test.Parser.Parser ()
+
 tests = TestList $ fmap TestCase lst
 
 lst :: [Assertion]

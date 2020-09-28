@@ -1,16 +1,16 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Test.Parser.Rfc2045 where
---------------------------------------------------------------------------------
-import           Data.Attoparsec.ByteString
-import           Data.ByteString
-import qualified Data.Map                   as M
-import           Test.HUnit
-import           Test.Parser.Parser
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc2045
-import           Network.Parser.Rfc2234
-import           Network.Parser.RfcCommon
---------------------------------------------------------------------------------
+
+import qualified Data.Map as M
+import Network.Parser.Rfc2045
+  ( Header (Header),
+    HeaderType (VersionH),
+    quoted_printable,
+    version,
+  )
+import Test.HUnit (Test (TestCase, TestList))
+import Test.Parser.Parser (aP, ae)
+
 tests = TestList $ fmap TestCase lst
 
 lst = [ test_version

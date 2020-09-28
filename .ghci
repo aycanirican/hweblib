@@ -1,7 +1,8 @@
-:set -isrc:test:.
+:set -isrc:test:dist/build/autogen
 :set -no-user-package-db
 :set -fno-warn-unused-do-bind
 :set -fwarn-incomplete-patterns
+
 :set -Wall
 :set -fwarn-tabs
 :set -fwarn-incomplete-record-updates

@@ -14,11 +14,20 @@
 -- <http://www.ietf.org/rfc/rfc2234.txt>
 
 module Network.Parser.Rfc2234 where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Attoparsec.ByteString
-import           Data.Word                  (Word8)
---------------------------------------------------------------------------------
+
+import Control.Applicative (Alternative (many, (<|>)))
+import Data.Attoparsec.ByteString
+  ( Parser,
+    anyWord8,
+    count,
+    many',
+    satisfy,
+    try,
+    word8,
+    (<?>),
+  )
+import Data.Functor (($>))
+import Data.Word (Word8)
 
 -- | Primitive Parsers (6.1 Core Rules)
 
@@ -69,8 +78,8 @@ ht = word8 9 <?> "horizontal tab"
 {-# INLINABLE ht #-}
 
 hexdigPred w = (w >= 65 && w <= 70)
-             || (w >= 97 && w <= 102)
-             || (w >= 48 && w <= 57)
+            || (w >= 97 && w <= 102)
+            || (w >= 48 && w <= 57)
 -- | Parse a hex digit
 hexdig :: Parser Word8
 hexdig = satisfy hexdigPred
@@ -96,7 +105,7 @@ ctl = satisfy ctlPred <?> "ascii control character"
 
 -- | Parse CRLF
 crlf :: Parser Word8
-crlf = return 10 <$> (try (cr *> lf) <|> lf)
+crlf = (try (cr *> lf) <|> lf) $> 10
 {-# INLINABLE crlf #-}
 
 -- | Parse CR
@@ -147,6 +156,6 @@ manyNtoM n m p
     | n <  0    = return []
     | n >  m    = return []
     | n == m    = count n p
-    | n == 0    = foldr (<|>) (return []) (map (\x -> try $ count x p) (Prelude.reverse [1..m]))
+    | n == 0    = foldr ((<|>) . (\ x -> try $ count x p)) (return []) (Prelude.reverse [1 .. m])
     | otherwise = (++) <$> count n p <*> manyNtoM 0 (m - n) p
 {-# INLINABLE manyNtoM #-}

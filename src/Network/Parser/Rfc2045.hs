@@ -14,21 +14,35 @@
 -- <http://www.ietf.org/rfc/rfc2045.txt>
 
 module Network.Parser.Rfc2045 where
---------------------------------------------------------------------------------
-import           Data.Char
-import           Control.Applicative
-import           Control.Monad (join, void)
-import           Data.Semigroup ((<>))
-import           Data.Attoparsec.ByteString
-import           Data.Attoparsec.ByteString.Char8 (decimal, stringCI)
-import           Data.ByteString as BS
+
+import Control.Applicative (Alternative (empty, many, (<|>)))
+import Control.Monad (join, void)
+import Data.Attoparsec.ByteString
+  ( Parser,
+    inClass,
+    many1,
+    satisfy,
+    try,
+    word8,
+  )
+import Data.Attoparsec.ByteString.Char8 (decimal, stringCI)
+import Data.ByteString as BS (ByteString, pack)
 import qualified Data.ByteString.Char8 as BSC
-import           Data.Map.Strict as M hiding (singleton)
-import           Data.Word (Word8)
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc2234
-import           Network.Parser.Rfc2822 (msg_id, quoted_string, text)
---------------------------------------------------------------------------------
+import Data.Char (chr, digitToInt, isHexDigit)
+import Data.Functor (($>))
+import Data.Map.Strict as M (Map, empty, fromList)
+import Data.Word (Word8)
+import Network.Parser.Rfc2234
+  ( charPred,
+    crlf,
+    ctlPred,
+    hexdig,
+    ht,
+    lwsp,
+    sp,
+  )
+import Network.Parser.Rfc2822 (msgId, quotedString, text)
+
 -- TODO: implement fields of rfc 822
 
 -- TODO: we don't support comments on header values "MIME-Version:
@@ -49,27 +63,29 @@ entityHeaders :: Parser [Header]
 entityHeaders = many entityHeader
 
 entityHeader :: Parser Header
-entityHeader  =   (version            <* crlf)
-              <|> (content            <* crlf)
-              <|> (encoding           <* crlf)
-              <|> (description        <* crlf)
-              <|> (contentId          <* crlf)
-              <|> (mimeExtensionField <* crlf)
+entityHeader = (version            <* crlf)
+           <|> (content            <* crlf)
+           <|> (encoding           <* crlf)
+           <|> (description        <* crlf)
+           <|> (contentId          <* crlf)
+           <|> (mimeExtensionField <* crlf)
 
 -- * 4.  MIME-Version Header Field
 
 version :: Parser Header
-version = ret <$> (stringCI "mime-version" *> colonsp *> decimal) -- ':'
-          <*> (word8 46 *> decimal) -- '.'
-    where ret a b = Header VersionH (pack [a+48,46,b+48]) M.empty
+version
+  = ret <$> (stringCI "mime-version" *> colonsp *> decimal) -- ':'
+        <*> (word8 46 *> decimal) -- '.'
+  where
+    ret a b = Header VersionH (pack [a+48,46,b+48]) M.empty
 
 -- * 5. Content-Type Header Field
 
-ietf_token :: Parser ByteString
-ietf_token = Control.Applicative.empty
+ietfToken :: Parser ByteString
+ietfToken = Control.Applicative.empty
 
-iana_token :: Parser ByteString
-iana_token = Control.Applicative.empty
+ianaToken :: Parser ByteString
+ianaToken = Control.Applicative.empty
 
 tspecialsPred :: Word8 -> Bool
 tspecialsPred = inClass "()<>@,;:\\\"/[]?="
@@ -87,38 +103,40 @@ attribute :: Parser [Word8]
 attribute = token
 
 parameter :: Parser (ByteString, ByteString)
-parameter = res <$> (attribute <* word8 61)
-                <*> value
-    where res a v = (pack a, v)
+parameter 
+    = res <$> (attribute <* word8 61)
+          <*> value
+    where 
+      res a v = (pack a, v)
 
-x_token :: Parser ByteString
-x_token = stringCI "x-" *> (pack <$> many1 (satisfy x_token_pred))
+xToken :: Parser ByteString
+xToken = stringCI "x-" *> (pack <$> many1 (satisfy x_token_pred))
   where
     x_token_pred :: Word8 -> Bool
     x_token_pred w = tokenPred w && (w /= 32)
 
 value :: Parser ByteString
-value = quoted_string <|> (pack <$> token)
+value = quotedString <|> (pack <$> token)
 
 -- discrete and composite types are a little bit different from BNF
 -- definitions in order to keep code flow clean.
 mtype :: Parser ByteString
 mtype = stringCI "multipart"
-        <|> stringCI "text"
-        <|> stringCI "image"
-        <|> stringCI "audio"
-        <|> stringCI "video"
-        <|> stringCI "application"
-        <|> stringCI "message"
-        <|> extensionToken
+    <|> stringCI "text"
+    <|> stringCI "image"
+    <|> stringCI "audio"
+    <|> stringCI "video"
+    <|> stringCI "application"
+    <|> stringCI "message"
+    <|> extensionToken
 
--- TODO: subtype = extensionToken <|> iana_token
+-- TODO: subtype = extensionToken <|> ianaToken
 subtype :: Parser ByteString
 subtype = pack <$> token
 
--- TODO: extensionToken = x_token <|> ietf_token
+-- TODO: extensionToken = xToken <|> ietfToken
 extensionToken :: Parser ByteString
-extensionToken = x_token
+extensionToken = xToken
 
 -- >>> parseOnly content "Content-type: text/plain; charset=us-ascii\n"
 -- Right (Header {hType = ContentH, hValue = "text/plain", hParams = fromList [("charset","us-ascii")]})
@@ -145,7 +163,7 @@ mechanism = stringCI "7bit"
             <|> stringCI "binary"
             <|> stringCI "quoted-printable"
             <|> stringCI "base64"
-            <|> x_token <|> ietf_token
+            <|> xToken <|> ietfToken
 
 -- * Quoted Printable
 
@@ -208,7 +226,7 @@ quotedPrintable = BSC.pack . decode . BSC.unpack
 
 -- * 7.  Content-ID Header Field
 contentId :: Parser Header
-contentId = ret <$> (stringCI "content-id" *> colonsp *> msg_id)
+contentId = ret <$> (stringCI "content-id" *> colonsp *> msgId)
     where ret i = Header IdH i M.empty
 
 -- * 8.  Content-Description Header Field
@@ -227,10 +245,10 @@ mimeExtensionField = do
 
 -- * Utilities
 colonsp :: Parser ()
-colonsp = word8 58 *> lwsp *> pure ()
+colonsp = word8 58 *> lwsp $> ()
 
 semicolonsp :: Parser ()
-semicolonsp = word8 59 *> lwsp *> pure ()
+semicolonsp = word8 59 *> lwsp $> ()
 
 -- | * Temporary ADTs
 ---------------------

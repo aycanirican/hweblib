@@ -14,6 +14,7 @@ Category:            Web
 Build-type:          Simple
 Cabal-version:       >= 1.10
 Tested-With:         GHC == 8.10.1
+                   , GHC == 8.8.4
                    , GHC == 8.6.5
                    , GHC == 8.2.2
 Extra-Source-Files:  README.md tests/mime-wiki.txt tests/benchmark-results.txt
@@ -97,23 +98,23 @@ test-suite hunit
                , text
                , hweblib
 
--- benchmark common-parses
---   type:             exitcode-stdio-1.0
---   hs-source-dirs:   benchmarks tests
---   main-is:          common-parses.hs
---   hs-source-dirs:   benchmarks tests
---   default-language: Haskell2010
---   ghc-options:      -w -O2 -threaded -fdicts-cheap -funbox-strict-fields
+benchmark common-parses
+  type:             exitcode-stdio-1.0
+  hs-source-dirs:   benchmarks tests
+  main-is:          common-parses.hs
+  hs-source-dirs:   benchmarks tests
+  default-language: Haskell2010
+  ghc-options:      -w -O2 -threaded -fdicts-cheap -funbox-strict-fields
 
---   build-depends: base >= 4 && < 5
---                , containers
---                , bytestring
---                , mtl
---                , transformers
---                , attoparsec
---                , criterion
---                , HUnit
---                , hweblib
+  build-depends: base >= 4 && < 5
+               , containers
+               , bytestring
+               , mtl
+               , transformers
+               , attoparsec
+               , criterion
+               , HUnit
+               , hweblib
 
 source-repository head
   type:     git

@@ -14,19 +14,22 @@
 -- <http://www.ietf.org/rfc/rfc7232.txt>
 
 module Network.Parser.Rfc7232 where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Semigroup                   ((<>))
-import           Data.Attoparsec.ByteString       as A
+
+import Control.Applicative (Alternative (many, (<|>)))
+import Data.Attoparsec.ByteString as A
+  ( Parser,
+    eitherP,
+    option,
+    satisfy,
+  )
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString
-import           Data.Time
-import           Data.Word
---------------------------------------------------------------------------------
-import           Network.Parser.Rfc5234           (dquote)
-import           Network.Parser.Rfc7230
-import           Network.Parser.Rfc7231
---------------------------------------------------------------------------------
+import Data.ByteString (ByteString, pack)
+import Data.Time (UTCTime)
+import Data.Word (Word8)
+import Network.Parser.Rfc5234 (dquote)
+import Network.Parser.Rfc7230 (obsText, asList, dash1)
+import Network.Parser.Rfc7231 (httpDate, Star (..))
+import Data.Functor (($>))
 
 {- Appendix C.  Collected ABNF
 
@@ -59,8 +62,8 @@ import           Network.Parser.Rfc7231
 -}
 
 -- * 2.2.  Last-Modified
-last_modified :: Parser UTCTime
-last_modified = http_date
+lastModified :: Parser UTCTime
+lastModified = httpDate
 
 -- * 2.3.  ETag
 
@@ -71,41 +74,42 @@ last_modified = http_date
 -- >>> parseOnly etag "\"\""
 -- Right "\"\""
 etag :: Parser ByteString
-etag = entity_tag
+etag = entityTag
 
-entity_tag :: Parser ByteString
-entity_tag = (<>) <$> option mempty weak <*> opaque_tag
+entityTag :: Parser ByteString
+entityTag = (<>) <$> option mempty weak <*> opaqueTag
 
 weak :: Parser ByteString
 weak = AC.string "W/"
 
-opaque_tag :: Parser ByteString
-opaque_tag = ret <$> asList dquote
-                 <*> many etagc
-                 <*> asList dquote
-  where ret a b c = pack (a ++ b ++ c)
+opaqueTag :: Parser ByteString
+opaqueTag = ret <$> asList dquote
+                <*> many etagc
+                <*> asList dquote
+  where 
+     ret a b c = pack (a ++ b ++ c)
 
 etagc :: Parser Word8
-etagc = satisfy (\w -> (w == 0x21) || (w >= 0x23 && w <= 0x7e)) <|> obs_text
+etagc = satisfy (\w -> (w == 0x21) || (w >= 0x23 && w <= 0x7e)) <|> obsText
 
 -- * 3.1.  If-Match
 
--- >>> parseOnly if_match "\"xyzzy\", \"r2d2xxxx\", \"c3piozzzz\""
+-- >>> parseOnly ifMatch "\"xyzzy\", \"r2d2xxxx\", \"c3piozzzz\""
 --
-if_match :: Parser (Either Star [ByteString])
-if_match = A.eitherP (AC.char '*' *> pure Star) (dash1 entity_tag)
+ifMatch :: Parser (Either Star [ByteString])
+ifMatch = A.eitherP (AC.char '*' $> Star) (dash1 entityTag)
 
 -- * 3.2.  If-None-Match
-if_none_match :: Parser (Either Star [ByteString])
-if_none_match = if_match
+ifNoneMatch :: Parser (Either Star [ByteString])
+ifNoneMatch = ifMatch
 
 -- * 3.3.  If-Modified-Since
-if_modified_since :: Parser UTCTime
-if_modified_since = http_date
+ifModifiedSince :: Parser UTCTime
+ifModifiedSince = httpDate
 
 -- * 3.4.  If-Unmodified-Since
-if_unmodified_since :: Parser UTCTime
-if_unmodified_since = http_date
+ifUnmodifiedSince :: Parser UTCTime
+ifUnmodifiedSince = httpDate
 
 -- * 3.5.  If-Range
 -- TODO: 7233

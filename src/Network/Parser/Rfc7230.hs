@@ -15,25 +15,49 @@
 
 module Network.Parser.Rfc7230
   where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Control.Monad                    (join)
-import           Data.Semigroup                   ((<>))
-import           Data.Attoparsec.ByteString
+
+import Control.Applicative (optional, Alternative (many, (<|>)))
+import Control.Monad (join)
+import Data.Attoparsec.ByteString
+  ( Parser,
+    count,
+    inClass,
+    many1,
+    manyTill,
+    option,
+    parseOnly,
+    satisfy,
+    word8,
+  )
 import qualified Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString                  hiding (count)
-import qualified Data.ByteString.Char8            as BSC
-import           Data.Scientific
-import           Data.Typeable
-import           Data.Word                        (Word8)
-import           GHC.Generics                     (Generic)
-import           Numeric                          (readHex)
---------------------------------------------------------------------------------
-import qualified Network.Parser.Rfc3986           as R3986
-import           Network.Parser.Rfc5234           as R5234
-import           Network.Parser.Utils
-import           Network.Types
---------------------------------------------------------------------------------
+import Data.ByteString (ByteString, pack, singleton)
+import qualified Data.ByteString.Char8 as BSC
+import Data.Scientific (Scientific)
+import Data.Typeable (Typeable)
+import Data.Word (Word8)
+import GHC.Generics (Generic)
+import qualified Network.Parser.Rfc3986 as R3986
+import Network.Parser.Rfc5234 as R5234
+  ( alpha,
+    crlf,
+    digit,
+    dquote,
+    hexdig,
+    htab,
+    manyN,
+    manyNtoM,
+    octet,
+    sp,
+    vchar,
+  )
+import Network.Parser.Utils (maxP)
+import Network.Types
+  ( HTTPVersion (HTTPVersion),
+    URI,
+    URIAuth,
+  )
+import Numeric (readHex)
+import Data.Functor (($>))
 
 data StartLine
   = RequestLine ByteString RequestTarget HTTPVersion
@@ -58,8 +82,7 @@ data Chunk
   = Chunk Int [(ByteString, ByteString)] ByteString
     deriving (Eq, Show, Generic, Typeable)
 
-data TrailerPart
-  = TrailerPart [(ByteString, ByteString)]
+newtype TrailerPart = TrailerPart [(ByteString, ByteString)]
     deriving (Eq, Show, Generic, Typeable)
 
 data ChunkedBody
@@ -83,24 +106,23 @@ data Protocol
   | ProtocolVersion ByteString
   | ProtocolNameVersion ByteString ByteString deriving (Eq, Show, Generic, Typeable)
 
-data Via = Via [(Protocol, ReceivedBy)] deriving (Eq, Show, Generic, Typeable)
+newtype Via = Via [(Protocol, ReceivedBy)] deriving (Eq, Show, Generic, Typeable)
 
 data ReceivedBy
   = ReceivedByHost ByteString (Maybe ByteString) -- ^ hostname port
   | ReceivedByPseudonym ByteString       -- ^ token
     deriving (Eq, Show, Generic, Typeable)
 
--- >>> parse http_version "HTTP/1.1"
+-- >>> parse httpVersion "HTTP/1.1"
 -- Done "" (HTTPVersion {httpMajor = 1, httpMinor = 1})
-http_version :: Parser HTTPVersion
-http_version
-  = AC.stringCI "http/1.0" *> return (HTTPVersion 1 0)
-  <|> AC.stringCI "http/1.1" *> return (HTTPVersion 1 1)
+httpVersion :: Parser HTTPVersion
+httpVersion = (AC.stringCI "http/1.0" $> HTTPVersion 1 0)
+          <|> (AC.stringCI "http/1.1" $> HTTPVersion 1 1)
 
-http_message :: Parser HTTPMessage
-http_message = do
-  sl <- start_line
-  xs <- many (header_field <* crlf) <* crlf
+httpMessage :: Parser HTTPMessage
+httpMessage = do
+  sl <- startLine
+  xs <- many (headerField <* crlf) <* crlf
   return $ HTTPMessage sl xs mempty
 
 -- 2.7.  Uniform Resource Identifiers
@@ -109,59 +131,59 @@ http_message = do
      partial-URI   = relative-part [ "?" query ]
 
 -}
-absolute_path :: Parser [ByteString]
-absolute_path = fmap pack <$> many1 (AC.char '/' *> R3986.segment)
+absolutePath :: Parser [ByteString]
+absolutePath = fmap pack <$> many1 (AC.char '/' *> R3986.segment)
 
 -- 3.1.  Start Line
-start_line :: Parser StartLine
-start_line = request_line <|> status_line
+startLine :: Parser StartLine
+startLine = requestLine <|> statusLine
 
 -- 3.1.1.  Request Line
-request_line :: Parser StartLine
-request_line = RequestLine <$> method <* sp <*> request_target <* sp <*> http_version <* crlf
+requestLine :: Parser StartLine
+requestLine = RequestLine <$> method <* sp <*> requestTarget <* sp <*> httpVersion <* crlf
 
 method :: Parser ByteString
 method = token
 
 -- 3.1.2.  Status Line
-status_line :: Parser StartLine
-status_line = StatusLine <$> (http_version <* sp) <*> status_code <* sp <*> reason_phrase <* crlf
+statusLine :: Parser StartLine
+statusLine = StatusLine <$> (httpVersion <* sp) <*> statusCode <* sp <*> reasonPhrase <* crlf
 
-status_code :: Parser ByteString
-status_code = pack <$> manyN 3 digit
+statusCode :: Parser ByteString
+statusCode = pack <$> manyN 3 digit
 
-reason_phrase :: Parser ByteString
-reason_phrase = pack <$> many (htab <|> sp <|> vchar <|> obs_text)
+reasonPhrase :: Parser ByteString
+reasonPhrase = pack <$> many (htab <|> sp <|> vchar <|> obsText)
 
 -- 3.2.  Header Fields
 -- |
--- >>> parseOnly header_field "User-Agent: curl/7.47.0"
+-- >>> parseOnly headerField "User-Agent: curl/7.47.0"
 -- Right ("User-Agent","curl/7.47.0")
-header_field :: Parser (ByteString, ByteString)
-header_field = (,) <$> (field_name <* word8 58 <* ows) <*> field_value <* ows
+headerField :: Parser (ByteString, ByteString)
+headerField = (,) <$> (fieldName <* word8 58 <* ows) <*> fieldValue <* ows
 
-field_name :: Parser ByteString
-field_name = token
+fieldName :: Parser ByteString
+fieldName = token
 
-field_value :: Parser ByteString
-field_value = BSC.concat <$> many (field_content <|> obs_fold)
+fieldValue :: Parser ByteString
+fieldValue = BSC.concat <$> many (fieldContent <|> obsFold)
 
 -- | Slightly modified version to catch below example.
--- >>> parseOnly field_content "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:29.0) Gecko/20100101 Firefox/29.0"
+-- >>> parseOnly fieldContent "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:29.0) Gecko/20100101 Firefox/29.0"
 -- Right "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.9; rv:29.0) Gecko/20100101 Firefox/29.0"
-field_content :: Parser ByteString
-field_content = do
-  x <- field_vchar
-  xs <- option mempty (many (sp <|> htab <|> field_vchar))
-
+fieldContent :: Parser ByteString
+fieldContent = do
+  x  <- fieldVchar
+  xs <- option mempty (many (sp <|> htab <|> fieldVchar))
   return $ pack (x:xs)
 
-field_vchar :: Parser Word8
-field_vchar = vchar <|> obs_text
+fieldVchar :: Parser Word8
+fieldVchar = vchar <|> obsText
 
-obs_fold :: Parser ByteString
-obs_fold = ret <$> (asList (ows *> crlf)) <*> (many1 (sp <|> htab))
-  where ret x y = pack (x ++ y)
+obsFold :: Parser ByteString
+obsFold = ret <$> asList (ows *> crlf) <*> many1 (sp <|> htab)
+  where
+    ret x y = pack (x ++ y)
 
 -- 3.2.3.  Whitespace
 ows, rws, bws :: Parser [Word8]
@@ -177,123 +199,121 @@ tchar :: Parser Word8
 tchar = satisfy p <|> digit <|> alpha
   where p = inClass "!#$%&'*+.^_`|~-"
 
-quoted_string :: Parser ByteString
-quoted_string = pack . join <$> (dquote *> many (asList qdtext <|> quoted_pair) <* dquote)
+quotedString :: Parser ByteString
+quotedString = pack . join <$> (dquote *> many (asList qdtext <|> quotedPair) <* dquote)
 
 qdtext :: Parser Word8
-qdtext = htab <|> sp <|> satisfy p <|> obs_text
+qdtext = htab <|> sp <|> satisfy p <|> obsText
   where
     p w = w == 0x21
           || (w >= 0x23 && w <= 0x5b)
           || (w >= 0x5d && w <= 0x7e)
 
-obs_text :: Parser Word8
-obs_text = satisfy (\w -> w >= 0x80 && w <= 0xff)
+obsText :: Parser Word8
+obsText = satisfy (\w -> w >= 0x80 && w <= 0xff)
 
 comment :: Parser ByteString
 comment = ret <$> (   word8 40
                       *> many (fmap singleton ctext
-                               <|> fmap pack quoted_pair
+                               <|> fmap pack quotedPair
                                <|> comment)
                       <* word8 41)
   where ret x = "(" <> BSC.concat x <> ")"
 
 ctext :: Parser Word8
-ctext = htab <|> sp <|> satisfy p <|> obs_text
+ctext = htab <|> sp <|> satisfy p <|> obsText
   where p w = (w >= 0x21 && w <= 0x27)
               || (w >= 0x2a && w <= 0x5b)
               || (w >= 0x5d && w <= 0x7e)
 
-quoted_pair :: Parser [Word8]
-quoted_pair = (\a b -> a:b:[]) <$> word8 92 <*> (htab <|> sp <|> vchar <|> obs_text)
+quotedPair :: Parser [Word8]
+quotedPair = (\a b -> [a,b]) <$> word8 92 <*> (htab <|> sp <|> vchar <|> obsText)
 
 -- 3.3.  Message Body
-message_body :: Parser ByteString
-message_body = pack <$> many octet
+messageBody :: Parser ByteString
+messageBody = pack <$> many octet
 
 -- 3.3.1.  Transfer-Encoding
-transfer_encoding :: Parser [TransferCoding]
-transfer_encoding = dash1 transfer_coding
+transferEncoding :: Parser [TransferCoding]
+transferEncoding = dash1 transferCoding
 
 -- 3.3.2.  Content-Length
-content_length :: Parser Integer
-content_length = read <$> many1 AC.digit
+contentLength :: Parser Integer
+contentLength = read <$> many1 AC.digit
 
 -- 4.  Transfer Codings
-transfer_coding :: Parser TransferCoding
-transfer_coding
-  =     AC.stringCI "chunked"  *> return Chunked
-    <|> AC.stringCI "compress" *> return Compress
-    <|> AC.stringCI "deflate"  *> return Deflate
-    <|> AC.stringCI "gzip"     *> return GZip
-    <|> transfer_extension
+transferCoding :: Parser TransferCoding
+transferCoding = (AC.stringCI "chunked"  $> Chunked)
+             <|> (AC.stringCI "compress" $> Compress)
+             <|> (AC.stringCI "deflate"  $> Deflate)
+             <|> (AC.stringCI "gzip"     $> GZip)
+             <|> transferExtension
 
-transfer_extension :: Parser TransferCoding
-transfer_extension
+transferExtension :: Parser TransferCoding
+transferExtension
   = TransferExtension <$> token
-                      <*> many (ows *> AC.char ';' *> ows *> transfer_parameter)
+                      <*> many (ows *> AC.char ';' *> ows *> transferParameter)
 
-transfer_parameter :: Parser (ByteString, ByteString)
-transfer_parameter = (,) <$> (token <* bws <* AC.char '=') <*> (bws *> (token <|> quoted_string))
+transferParameter :: Parser (ByteString, ByteString)
+transferParameter = (,) <$> (token <* bws <* AC.char '=') <*> (bws *> (token <|> quotedString))
 
 -- 4.1.  Chunked Transfer Coding
 
-chunked_body :: Parser ChunkedBody
-chunked_body = ChunkedBody <$> (manyTill chunk last_chunk) <*> (trailer_part <* crlf)
+chunkedBody :: Parser ChunkedBody
+chunkedBody = ChunkedBody <$> manyTill chunk lastChunk <*> (trailerPart <* crlf)
 
 chunk :: Parser Chunk
 chunk = do
-  n <- chunk_size
-  ext <- option [] chunk_ext <* crlf
-  d <- count n octet <* crlf
+  n   <- chunkSize
+  ext <- option [] chunkExt <* crlf
+  d   <- count n octet <* crlf
   return $ Chunk n ext (pack d)
 
-chunk_size :: Parser Int
-chunk_size = do
+chunkSize :: Parser Int
+chunkSize = do
   a <- readHex . BSC.unpack . pack <$> many1 hexdig
   case a of
-    [] -> fail "invalid chunk size"
+    []      -> fail "invalid chunk size"
     [(i,_)] -> return i
-    _ -> fail "invalid chunk size"
+    _       -> fail "invalid chunk size"
 
-last_chunk :: Parser Chunk
-last_chunk = lastChunk <$> (many1 (AC.char '0') *> option [] chunk_ext <* crlf)
-  where lastChunk ext = Chunk 0 ext mempty
+lastChunk :: Parser Chunk
+lastChunk = lastChunk' <$> (many1 (AC.char '0') *> option [] chunkExt <* crlf)
+  where
+    lastChunk' ext = Chunk 0 ext mempty
 
-chunk_data :: Parser ByteString
-chunk_data = pack <$> many1 octet
-
+chunkData :: Parser ByteString
+chunkData = pack <$> many1 octet
 
 -- 4.1.1.  Chunk Extensions
-chunk_ext :: Parser [(ByteString, ByteString)]
-chunk_ext = many ((,) <$> (AC.char ';' *> ows *> chunk_ext_name)
-                      <*> option mempty (AC.char '=' *> chunk_ext_val))
+chunkExt :: Parser [(ByteString, ByteString)]
+chunkExt = many ((,) <$> (AC.char ';' *> ows *> chunkExtName)
+                      <*> option mempty (AC.char '=' *> chunkExtVal))
 
-chunk_ext_name :: Parser ByteString
-chunk_ext_name = token
+chunkExtName :: Parser ByteString
+chunkExtName = token
 
-chunk_ext_val :: Parser ByteString
-chunk_ext_val = token <|> quoted_string
+chunkExtVal :: Parser ByteString
+chunkExtVal = token <|> quotedString
 
 -- 4.1.2.  Chunked Trailer Part
-trailer_part :: Parser TrailerPart
-trailer_part = TrailerPart <$> many (header_field <* crlf)
+trailerPart :: Parser TrailerPart
+trailerPart = TrailerPart <$> many (headerField <* crlf)
 
 -- 4.3.  TE
 te :: Parser [TCoding]
-te = dash t_codings
+te = dash tCodings
 
-t_codings :: Parser TCoding
-t_codings
-  = (const Trailers <$> AC.stringCI "trailers")
-    <|> (TCoding <$> transfer_coding <*> option Nothing (Just <$> t_ranking))
+tCodings :: Parser TCoding
+tCodings = (Trailers <$ AC.stringCI "trailers")
+       <|> (TCoding <$> transferCoding <*> optional tRanking)
 
-t_ranking :: Parser Scientific
-t_ranking = ows *> AC.char ';' *> ows *> AC.stringCI "q=" *> rank
+tRanking :: Parser Scientific
+tRanking = ows *> AC.char ';' *> ows *> AC.stringCI "q=" *> rank
 
 rank :: Parser Scientific
 rank = (AC.char '0' *> option 0 prec)
-   <|> (AC.char '1' *> option 1 (AC.char '.' *> manyNtoM 0 3 (AC.char '0') *> return 1))
+   <|> (AC.char '1' *> option 1 (AC.char '.' *> manyNtoM 0 3 (AC.char '0') $> 1))
   where
     prec :: Parser Scientific
     prec = do
@@ -304,59 +324,59 @@ rank = (AC.char '0' *> option 0 prec)
 
 -- 4.4.  Trailer
 trailer :: Parser [ByteString]
-trailer = dash1 field_name
+trailer = dash1 fieldName
 
 -- 5.3.  Request Target
-request_target :: Parser RequestTarget
-request_target
-  =     absolute_form
-    <|> (const AsteriskForm  <$> asterisk_form)
-    <|> origin_form
-    <|> authority_form
+requestTarget :: Parser RequestTarget
+requestTarget = absoluteForm
+            <|> (AsteriskForm <$ asteriskForm)
+            <|> originForm
+            <|> authorityForm
 
 -- 5.3.1.  origin-form
-origin_form :: Parser RequestTarget
-origin_form = OriginForm <$> R3986.pathAbsolute <*> option mempty (AC.char '?' *> R3986.query)
+originForm :: Parser RequestTarget
+originForm = OriginForm <$> R3986.pathAbsolute <*> option mempty (AC.char '?' *> R3986.query)
 
 -- 5.3.2.  absolute-form
-absolute_form :: Parser RequestTarget
-absolute_form = AbsoluteForm <$> R3986.absoluteUri
+absoluteForm :: Parser RequestTarget
+absoluteForm = AbsoluteForm <$> R3986.absoluteUri
 
 -- 5.3.3.  authority-form
-authority_form :: Parser RequestTarget
-authority_form = AuthorityForm <$> R3986.authority
+authorityForm :: Parser RequestTarget
+authorityForm = AuthorityForm <$> R3986.authority
 
 -- 5.3.4.  asterisk-form
-asterisk_form :: Parser RequestTarget
-asterisk_form = AC.char '*' >> return AsteriskForm
+asteriskForm :: Parser RequestTarget
+asteriskForm = AC.char '*' >> return AsteriskForm
 
 -- 5.4.  Host
 host :: Parser (ByteString, Maybe ByteString)
-host = (,) <$> uri_host <*> option Nothing (Just <$> (AC.char ':' *> port))
+host = (,) <$> uriHost <*> optional (AC.char ':' *> port)
 
 port :: Parser ByteString
 port = R3986.port
-uri_host :: Parser ByteString
-uri_host = R3986.host
+
+uriHost :: Parser ByteString
+uriHost = R3986.host
 
 -- 5.7.  Message Forwarding
 
 -- 5.7.1.  Via
 via :: Parser Via
-via = Via <$> dash1 ((,) <$> (received_protocol <* rws)
-                         <*> received_by <* option mempty (rws <* comment))
+via = Via <$> dash1 ((,) <$> (receivedProtocol <* rws)
+                         <*> receivedBy <* option mempty (rws <* comment))
 
-received_protocol :: Parser Protocol
-received_protocol
-  = do n <- option Nothing (fmap Just (protocol_name <* AC.char '/'))
-       v <- protocol_version
-       return $ case n of
-          Just n' -> ProtocolNameVersion n' v
-          Nothing -> ProtocolVersion v
+receivedProtocol :: Parser Protocol
+receivedProtocol = do 
+  n <- option Nothing (fmap Just (protocolName <* AC.char '/'))
+  v <- protocolVersion
+  return $ case n of
+    Just n' -> ProtocolNameVersion n' v
+    Nothing -> ProtocolVersion v
 
-received_by :: Parser ReceivedBy
-received_by = (uncurry ReceivedByHost <$> host)
-              <|> (ReceivedByPseudonym <$> pseudonym)
+receivedBy :: Parser ReceivedBy
+receivedBy = (uncurry ReceivedByHost <$> host)
+         <|> (ReceivedByPseudonym    <$> pseudonym)
 
 pseudonym :: Parser ByteString
 pseudonym = token
@@ -364,27 +384,27 @@ pseudonym = token
 -- 6.  Connection Management
 -- 6.1.  Connection
 connection :: Parser [ByteString]
-connection = dash1 connection_option
+connection = dash1 connectionOption
 
-connection_option :: Parser ByteString
-connection_option = token
+connectionOption :: Parser ByteString
+connectionOption = token
 
 -- 6.7.  Upgrade
 upgrade :: Parser [Protocol]
 upgrade = dash1 protocol
 
 protocol :: Parser Protocol
-protocol = do n <- protocol_name
-              v <- option Nothing (Just <$> (AC.char '/' *> protocol_version))
+protocol = do n <- protocolName
+              v <- optional (AC.char '/' *> protocolVersion)
               return $ case v of
                 Just v' -> ProtocolNameVersion n v'
                 Nothing -> ProtocolName n
 
-protocol_name :: Parser ByteString
-protocol_name = token
+protocolName :: Parser ByteString
+protocolName = token
 
-protocol_version :: Parser ByteString
-protocol_version = token
+protocolVersion :: Parser ByteString
+protocolVersion = token
 
 -- 7.  ABNF List Extension: #rule
 {- A #rule extension to the ABNF rules of [RFC5234] is used to improve
@@ -415,7 +435,8 @@ dashN n p
   | otherwise = (\a b c -> a:(b++c)) <$> p
                                      <*> count (n-1) (addSep p)
                                      <*> many        (addSep p)
-  where addSep x = ows *> word8 44 *> ows *> x
+  where 
+    addSep x = ows *> word8 44 *> ows *> x
 
 dashNtoM :: Int -> Int -> Parser a -> Parser [a]
 dashNtoM n m p
@@ -425,7 +446,7 @@ dashNtoM n m p
   | n == 0    = sepByMaxN m p sep
   | otherwise = (++) <$> sepByN n p sep <*> (sep *> dashNtoM 0 (m-n) p)
   where
-    sep = (ows *> word8 44 *> ows *> return ())
+    sep = ows *> word8 44 *> ows $> ()
 
 -- | Parse `n` times separated by `s`
 sepByN :: Int -> Parser a -> Parser () -> Parser [a]
@@ -603,4 +624,3 @@ sepByMaxN n p s = ((:) <$> p <*> maxP (n-1) (s *> p)) <|> return mempty
 
 asList :: Parser a -> Parser [a]
 asList p = (:[]) <$> p
-

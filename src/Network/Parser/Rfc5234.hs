@@ -14,11 +14,18 @@
 -- <http://www.ietf.org/rfc/rfc5234.txt>
 
 module Network.Parser.Rfc5234 where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Attoparsec.ByteString
-import           Data.Word                  (Word8)
---------------------------------------------------------------------------------
+
+import Control.Applicative (Alternative (many, (<|>)))
+import Data.Attoparsec.ByteString
+  ( Parser,
+    anyWord8,
+    count,
+    many',
+    satisfy,
+    try,
+    (<?>),
+  )
+import Data.Word (Word8)
 
 -- | Appendix B.1  Core ABNF of ABNF
 
@@ -99,7 +106,7 @@ ctl = satisfy ctlPred <?> "ascii control character"
 
 -- | Parse CRLF
 crlf :: Parser Word8
-crlf = return 10 <$> (try (cr *> lf) <|> lf)
+crlf = 10 <$ (try (cr *> lf) <|> lf)
 {-# INLINABLE crlf #-}
 
 -- | Parse CR
@@ -130,16 +137,20 @@ alpha = satisfy alphaPred
 -- | Match a parser at least @N@ times.
 manyN :: Int -> Parser a -> Parser [a]
 manyN n p
-    | n <= 0    = return []
-    | otherwise = (++) <$> count n p <*> many' p
-{-# INLINABLE manyN #-}
+  | n <= 0 = return []
+  | otherwise = (++) <$> count n p <*> many' p
+{-# INLINEABLE manyN #-}
 
 -- | Match a parser at least @N@ times, but no more than @M@ times.
 manyNtoM :: Int -> Int -> Parser a -> Parser [a]
 manyNtoM n m p
-    | n <  0    = return []
-    | n >  m    = return []
-    | n == m    = count n p
-    | n == 0    = foldr (<|>) (return []) (map (\x -> try $ count x p) (Prelude.reverse [1..m]))
-    | otherwise = (++) <$> count n p <*> manyNtoM 0 (m - n) p
-{-# INLINABLE manyNtoM #-}
+  | n < 0 = return []
+  | n > m = return []
+  | n == m = count n p
+  | n == 0 =
+    foldr
+      ((<|>) . (\x -> try $ count x p))
+      (return [])
+      (Prelude.reverse [1 .. m])
+  | otherwise = (++) <$> count n p <*> manyNtoM 0 (m - n) p
+{-# INLINEABLE manyNtoM #-}

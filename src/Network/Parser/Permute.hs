@@ -1,7 +1,4 @@
-{-# LANGUAGE DeriveGeneric             #-}
 {-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE OverloadedStrings         #-}
-{-# LANGUAGE TupleSections             #-}
 
 -- |
 -- Module      :  Network.Parser.7231
@@ -28,10 +25,9 @@ module Network.Parser.Permute
   , (<|?>), (<$?>)
   ) where
 
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Foldable       (asum)
---------------------------------------------------------------------------------
+import Control.Applicative
+import Data.Foldable (asum)
+
 infixl 1 <||>, <|?>
 infixl 2 <$$>, <$?>
 

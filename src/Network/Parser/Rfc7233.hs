@@ -1,7 +1,6 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE TupleSections      #-}
 
 -- |
 -- Module      :  Network.Parser.7233
@@ -17,21 +16,32 @@
 -- <http://www.ietf.org/rfc/rfc7233.txt>
 
 module Network.Parser.Rfc7233 where
---------------------------------------------------------------------------------
-import           Control.Applicative
-import           Data.Attoparsec.ByteString       as BS
-import           Data.Attoparsec.ByteString.Char8 as AC
-import           Data.ByteString
-import           Data.Time
-import           Data.Typeable
-import qualified GHC.Generics                     as GHC
-import           Prelude                          hiding (product)
---------------------------------------------------------------------------------
-import qualified Network.Parser.Rfc2234           as R2234
-import           Network.Parser.Rfc7230
-import           Network.Parser.Rfc7231           (http_date)
-import           Network.Parser.Rfc7232           (entity_tag)
---------------------------------------------------------------------------------
+
+import Control.Applicative
+  ( Alternative (many, (<|>)),
+    optional,
+  )
+import Data.Attoparsec.ByteString as BS
+  ( Parser,
+    eitherP,
+    many1,
+  )
+import Data.Attoparsec.ByteString.Char8 as AC
+  ( char,
+    digit,
+    string,
+  )
+import Data.ByteString (ByteString, pack)
+import Data.Functor (($>))
+import Data.Time (UTCTime)
+import Data.Typeable (Typeable)
+import qualified GHC.Generics as GHC
+import qualified Network.Parser.Rfc2234 as R2234
+import Network.Parser.Rfc7230 (dash1, token)
+import Network.Parser.Rfc7231 (httpDate)
+import Network.Parser.Rfc7232 (entityTag)
+import Prelude hiding (product)
+
 
 {- Holy memory consumer
 
@@ -46,44 +56,44 @@ data ByteRange
     deriving (Eq, Show, GHC.Generic)
 -- * 2.  Range Units
 
-range_unit :: Parser ByteString
-range_unit = bytes_unit <|> other_range_unit
+rangeUnit :: Parser ByteString
+rangeUnit = bytesUnit <|> otherRangeUnit
 
 -- * 2.1.  Byte Ranges
-bytes_unit :: Parser ByteString
-bytes_unit = AC.string "bytes"
+bytesUnit :: Parser ByteString
+bytesUnit = AC.string "bytes"
 
-byte_ranges_specifier :: Parser [ByteRange]
-byte_ranges_specifier = (bytes_unit <* AC.char '=') *> byte_range_set
+byteRangesSpecifier :: Parser [ByteRange]
+byteRangesSpecifier = (bytesUnit <* AC.char '=') *> byteRangeSet
 
 
-byte_range_set :: Parser [ByteRange]
-byte_range_set = dash1 ((ByteRange           <$> byte_range_spec)
-                        <|> (ByteSuffixRange <$> suffix_byte_range_spec))
+byteRangeSet :: Parser [ByteRange]
+byteRangeSet = dash1 ((ByteRange           <$> byteRangeSpec)
+                  <|> (ByteSuffixRange <$> suffixByteRangeSpec))
 
-byte_range_spec :: Parser (Maybe Int, Maybe Int)
-byte_range_spec = (,) <$> (Just <$> (first_byte_pos <* AC.char '-'))
-                      <*> option Nothing (Just <$> last_byte_pos)
+byteRangeSpec :: Parser (Maybe Int, Maybe Int)
+byteRangeSpec = (,) <$> (Just <$> (firstBytePos <* AC.char '-'))
+                    <*> optional lastBytePos
 
-first_byte_pos :: Parser Int
-first_byte_pos = read <$> many1 digit
+firstBytePos :: Parser Int
+firstBytePos = read <$> many1 digit
 
-last_byte_pos :: Parser Int
-last_byte_pos = read <$> many1 digit
+lastBytePos :: Parser Int
+lastBytePos = read <$> many1 digit
 
-suffix_byte_range_spec :: Parser Int
-suffix_byte_range_spec = AC.char '-' *> suffix_length
+suffixByteRangeSpec :: Parser Int
+suffixByteRangeSpec = AC.char '-' *> suffixLength
 
-suffix_length :: Parser Int
-suffix_length = read <$> many1 digit
+suffixLength :: Parser Int
+suffixLength = read <$> many1 digit
 
 -- * 2.2.  Other Range Units
-other_range_unit :: Parser ByteString
-other_range_unit = token
+otherRangeUnit :: Parser ByteString
+otherRangeUnit = token
 
 -- * 2.3.  Accept-Ranges
-acceptable_ranges :: Parser [ByteString]
-acceptable_ranges = dash1 range_unit
+acceptableRanges :: Parser [ByteString]
+acceptableRanges = dash1 rangeUnit
 
 -- * 3.  Range Requests
 -- * 3.1.  Range
@@ -95,21 +105,21 @@ other-range-set = 1*VCHAR
 -}
 
 range :: Parser (Either [ByteRange] (ByteString, ByteString))
-range = eitherP byte_ranges_specifier other_ranges_specifier
+range = eitherP byteRangesSpecifier otherRangesSpecifier
 
-other_ranges_specifier :: Parser (ByteString, ByteString)
-other_ranges_specifier = (,) <$> other_range_unit <*> ("=" *> other_range_set)
+otherRangesSpecifier :: Parser (ByteString, ByteString)
+otherRangesSpecifier = (,) <$> otherRangeUnit <*> ("=" *> otherRangeSet)
 
-other_range_set :: Parser ByteString
-other_range_set = pack <$> many1 R2234.vchar
+otherRangeSet :: Parser ByteString
+otherRangeSet = pack <$> many1 R2234.vchar
 
 -- * 3.2.  If-Range
 
 {-
 If-Range = entity-tag / HTTP-date
 -}
-if_range :: Parser (Either ByteString UTCTime)
-if_range = (Left <$> entity_tag) <|> (Right <$> http_date)
+ifRange :: Parser (Either ByteString UTCTime)
+ifRange = (Left <$> entityTag) <|> (Right <$> httpDate)
 
 -- * 4.2.  Content-Range
 
@@ -130,8 +140,8 @@ other-content-range = other-range-unit SP other-range-resp
 other-range-resp    = *CHAR
 -}
 
--- content_range :: ByteString, Either ((Int, Int), Maybe Int) Int)
--- content_range = eitherP byte_content_range other_content_range
+-- contentRange :: ByteString, Either ((Int, Int), Maybe Int) Int)
+-- contentRange = eitherP byteContentRange otherContentRange
 
 data ContentRange = ContentRangeSatisfied (Int, Int) ContentRangeLength
                   | ContentRangeUnsatisfied Int
@@ -141,30 +151,30 @@ data ContentRangeLength = ContentRangeLengthKnown Int
                         | ContentRangeLengthUnknown
     deriving (Eq, Show, Typeable, GHC.Generic)
 
-content_range :: Parser (Either ContentRange (ByteString, ByteString))
-content_range = eitherP byte_content_range other_content_range
+contentRange :: Parser (Either ContentRange (ByteString, ByteString))
+contentRange = eitherP byteContentRange otherContentRange
 
-byte_content_range :: Parser ContentRange
-byte_content_range = byte_range_resp <|> unsatisfied_range
+byteContentRange :: Parser ContentRange
+byteContentRange = byteRangeResp <|> unsatisfiedRange
 
-byte_range_resp :: Parser ContentRange
-byte_range_resp
+byteRangeResp :: Parser ContentRange
+byteRangeResp
   = ContentRangeSatisfied
-      <$> (byte_range <* AC.char '/')
-      <*> (    (ContentRangeLengthKnown <$> complete_length)
-           <|> (AC.char '*' *> return ContentRangeLengthUnknown))
+      <$> (byteRange <* AC.char '/')
+      <*> (    (ContentRangeLengthKnown <$> completeLength)
+           <|> (AC.char '*' $> ContentRangeLengthUnknown))
 
-byte_range :: Parser (Int, Int)
-byte_range = (,) <$> first_byte_pos <*> (AC.char '-' *> last_byte_pos)
+byteRange :: Parser (Int, Int)
+byteRange = (,) <$> firstBytePos <*> (AC.char '-' *> lastBytePos)
 
-unsatisfied_range :: Parser ContentRange
-unsatisfied_range = ContentRangeUnsatisfied <$> ("*/" *> complete_length)
+unsatisfiedRange :: Parser ContentRange
+unsatisfiedRange = ContentRangeUnsatisfied <$> ("*/" *> completeLength)
 
-complete_length :: Parser Int
-complete_length = read <$> many1 digit
+completeLength :: Parser Int
+completeLength = read <$> many1 digit
 
-other_content_range :: Parser (ByteString, ByteString)
-other_content_range = (,) <$> other_range_unit <*> (R2234.sp *> other_range_resp)
+otherContentRange :: Parser (ByteString, ByteString)
+otherContentRange = (,) <$> otherRangeUnit <*> (R2234.sp *> otherRangeResp)
 
-other_range_resp :: Parser ByteString
-other_range_resp = pack <$> many R2234.octet
+otherRangeResp :: Parser ByteString
+otherRangeResp = pack <$> many R2234.octet
